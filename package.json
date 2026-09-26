@@ -1,0 +1,13 @@
+{
+  "name": "coffee-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build --base=./ --outDir docs",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {"@neondatabase/neon-js": "0.7.0-beta"},
+  "devDependencies": {"vite": "^7.0.0"}
+}

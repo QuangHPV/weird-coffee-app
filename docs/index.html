@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f3ed">
+  <meta name="description" content="Browse Singapore coffee beans and keep your Wish list in sync.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <title>Coffee Beans SG</title>
+  <script type="module" crossorigin src="./assets/index-BbrPd88d.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BNwUeacC.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><span class="eyebrow">Coffee Beans SG</span><h1>Find your next bag</h1></div>
+    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="signout" type="button" hidden>Sign out</button></div>
+  </header>
+  <main>
+    <section id="auth" class="auth-panel" hidden>
+      <h2>Sign in</h2>
+      <p>Sign in with your private coffee account.</p>
+      <form id="auth-form">
+        <label>Email<input id="email" type="email" autocomplete="email" required></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+        <button id="auth-submit" class="primary" type="submit">Sign in</button>
+      </form>
+      <p id="auth-error" class="error" role="alert" hidden></p>
+    </section>
+    <section id="app" hidden>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <section id="browse" aria-labelledby="browse-heading">
+        <div class="section-heading"><div><span class="eyebrow">Browse</span><h2 id="browse-heading">Coffee from Singapore roasters</h2></div><span id="published"></span></div>
+        <div class="filters">
+          <label class="search-label">Search<input id="search" type="search" placeholder="Bean, roaster, origin…"></label>
+          <label>Roaster<select id="roaster"><option value="">All roasters</option></select></label>
+          <label>Origin<select id="origin"><option value="">All origins</option></select></label>
+          <label>Process<select id="process"><option value="">All processes</option></select></label>
+          <label class="checkbox"><input id="stock" type="checkbox" checked> In stock</label>
+          <label class="checkbox"><input id="archived" type="checkbox"> Archived</label>
+        </div>
+        <p id="count" class="muted"></p>
+        <div id="bean-list" class="bean-list"></div>
+      </section>
+      <section id="wishlist" aria-labelledby="wishlist-heading" hidden>
+        <div class="section-heading"><div><span class="eyebrow">Saved</span><h2 id="wishlist-heading">Wish list <span id="wish-count"></span></h2></div></div>
+        <p id="wish-status" class="muted" role="status"></p>
+        <ol id="wish-list" class="wish-list"></ol>
+      </section>
+      <section id="activity" aria-labelledby="activity-heading" hidden>
+        <div class="section-heading"><div><span class="eyebrow">Recent history</span><h2 id="activity-heading">Activity</h2></div></div>
+        <p class="muted">Completed scans from your Mac appear here after they sync.</p>
+        <div id="activity-list"></div>
+      </section>
+    </section>
+  </main>
+  <nav id="navigation" aria-label="Main navigation" hidden>
+    <button class="active" data-view="browse" type="button" aria-current="page">Browse</button>
+    <button data-view="wishlist" type="button">Wish list</button>
+    <button data-view="activity" type="button">Activity</button>
+  </nav>
+</body>
+</html>
