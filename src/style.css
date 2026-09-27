@@ -125,3 +125,8 @@ body.filters-open { overflow: hidden; }
 .wish-placeholder { opacity: .32; border-style: dashed; }
 .wish-drag-ghost { position: fixed; z-index: 20; pointer-events: none; margin: 0; transform: scale(1.02); box-shadow: 0 14px 28px #49321b30; opacity: .96; }
 body.wish-reordering { user-select: none; -webkit-user-select: none; }
+
+nav#navigation{grid-template-columns:repeat(4,minmax(0,1fr))}
+nav#navigation button{min-width:0}
+#backlog{--text:#30251e;--panel:#fffdfa;--muted:#756d67;--line:#e5d9cd;--accent:#794a2a;--no:#a3372d}
+#backlog .backlog-shell{min-width:0;max-width:100%}

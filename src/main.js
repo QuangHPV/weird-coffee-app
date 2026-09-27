@@ -1,4 +1,6 @@
 import { createClient } from '@neondatabase/neon-js';
+import { mountBacklog } from './backlog-ui.js';
+import './backlog-ui.css';
 
 const $ = id => document.getElementById(id);
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
@@ -12,6 +14,35 @@ let snapshot = null;
 let ranking = null;
 let saving = false;
 let view = 'browse';
+let demoBacklog = { document: { buckets: [
+  { id: 'sample-1', title: 'Next mobile polish', stage: 'pending', version: 'v1.1', items: [
+    { id: 'sample-task-1', text: 'Refine the Browse cards', done: false, note: false, depth: 0 },
+    { id: 'sample-task-2', text: 'Review spacing on a phone', done: true, note: false, depth: 0 }
+  ] },
+  { id: 'sample-2', title: 'Ideas to collect', stage: 'collecting', version: '', items: [
+    { id: 'sample-task-3', text: 'Add more roasters', done: false, note: false, depth: 0 }
+  ] }
+] }, revision: 1 };
+const backlog = mountBacklog($('backlog-root'), {
+  async load() {
+    if (demoMode) return structuredClone(demoBacklog);
+    if (!client || !navigator.onLine) throw new Error('Connect to load the backlog.');
+    const result = await client.from('backlog_state').select('document,revision');
+    if (result.error) throw result.error;
+    if (!result.data?.length) throw new Error('Backlog is not available for this account.');
+    return result.data[0];
+  },
+  async save(document, revision) {
+    if (demoMode) { demoBacklog = { document, revision: revision + 1 }; return structuredClone(demoBacklog); }
+    const result = await client.rpc('save_backlog', { expected_revision: revision, next_document: document });
+    if (result.error) {
+      const error = new Error(result.error.message || 'Could not save the backlog.');
+      error.conflict = result.error.code === '40001' || /another device/i.test(result.error.message || '');
+      throw error;
+    }
+    return Array.isArray(result.data) ? result.data[0] : result.data;
+  }
+});
 const ROAST_LEVELS = ['light', 'medium', 'dark'];
 const ORIGIN_AREAS = [
   { name: 'Central America & Mexico', countries: ['Belize', 'Costa Rica', 'El Salvador', 'Guatemala', 'Honduras', 'Mexico', 'Nicaragua', 'Panama'] },
@@ -114,6 +145,7 @@ async function loadData() {
     buildFilters();
     render();
     notice('');
+    if (view === 'backlog') backlog.reload();
     return;
   }
   if (!client || !navigator.onLine) {
@@ -138,6 +170,7 @@ async function loadData() {
     buildFilters();
     render();
     notice('');
+    if (view === 'backlog') backlog.reload();
   } catch {
     notice('Could not load the latest data. Reconnect and reopen the app to try again.');
   }
@@ -624,7 +657,7 @@ function render() { renderBrowse(); renderWishlist(); renderActivity(); }
 
 function setView(next) {
   view = next;
-  for (const name of ['browse', 'wishlist', 'activity']) $(name).hidden = name !== view;
+  for (const name of ['browse', 'wishlist', 'activity', 'backlog']) $(name).hidden = name !== view;
   document.querySelectorAll('nav button').forEach(button => {
     const active = button.dataset.view === view;
     button.classList.toggle('active', active);
@@ -632,6 +665,7 @@ function setView(next) {
     else button.removeAttribute('aria-current');
   });
   window.scrollTo(0, 0);
+  if (view === 'backlog') backlog.reload();
 }
 
 document.querySelectorAll('nav button').forEach(button => button.onclick = () => setView(button.dataset.view));
@@ -729,6 +763,8 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorke
 if (demoMode) {
   showSignedIn();
   loadData();
+  const previewView = new URLSearchParams(location.search).get('view');
+  if (['browse', 'wishlist', 'activity', 'backlog'].includes(previewView)) setView(previewView);
 } else if (!client) {
   showSignedOut();
   $('auth-form').hidden = true;

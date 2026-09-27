@@ -17,3 +17,10 @@ server and is not included in the GitHub Pages build.
 
 Browse filters open from the icon beside the bean count. Changes in the filter
 panel affect the list only after Apply; Cancel restores the previous selection.
+
+The fourth tab is the shared Backlog. It reads `public.backlog_state` and saves
+through the authenticated `save_backlog` function with a revision check. The Mac
+manager uses the same document. Apply `migrations/001_backlog.sql` to a new Neon
+branch before running this version there. New buckets start in Collecting; move
+them to Pending when ready for a work batch, then In progress and Done. Buckets
+can carry an optional version label, and tasks can move between buckets.

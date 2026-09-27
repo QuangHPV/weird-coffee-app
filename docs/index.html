@@ -19,8 +19,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-C5Q7J3WX.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CxxUEHC-.css">
+  <script type="module" crossorigin src="./assets/index-Hzl8-pi9.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DdqhlamH.css">
 </head>
 <body>
   <header class="topbar">
@@ -60,6 +60,7 @@
         <p class="muted">Completed scans from your Mac appear here after they sync.</p>
         <div id="activity-list"></div>
       </section>
+      <section id="backlog" aria-label="Backlog" hidden><div id="backlog-root" class="backlog-shell"></div></section>
     </section>
   </main>
   <div id="filter-overlay" class="filter-overlay" hidden>
@@ -106,6 +107,14 @@
       <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="9"/>
         <path class="nav-icon-detail" d="M12 6.5V12l3.7 2.3"/>
+      </svg>
+    </button>
+    <button data-view="backlog" type="button" aria-label="Backlog">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="6" rx="1.5"/>
+        <rect x="14" y="3" width="7" height="6" rx="1.5"/>
+        <rect x="8.5" y="15" width="7" height="6" rx="1.5"/>
+        <path class="nav-icon-detail" d="M6.5 9v3h11V9M12 12v3"/>
       </svg>
     </button>
   </nav>
