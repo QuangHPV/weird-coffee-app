@@ -8,39 +8,46 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <title>Coffee Beans SG</title>
-  <script type="module" crossorigin src="./assets/index-BbrPd88d.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BNwUeacC.css">
+  <title>Coffee</title>
+  <script>
+    if (location.hostname === '127.0.0.1' && location.port === '5173' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        if (!registrations.length) return;
+        return Promise.all(registrations.map(registration => registration.unregister())).then(() => {
+          if (navigator.serviceWorker.controller) location.reload();
+        });
+      }).catch(() => {});
+    }
+  </script>
+  <script type="module" crossorigin src="./assets/index-C5Q7J3WX.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CxxUEHC-.css">
 </head>
 <body>
   <header class="topbar">
-    <div><span class="eyebrow">Coffee Beans SG</span><h1>Find your next bag</h1></div>
-    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="signout" type="button" hidden>Sign out</button></div>
+    <h1>Find your next bag</h1>
+    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
   </header>
   <main>
     <section id="auth" class="auth-panel" hidden>
       <h2>Sign in</h2>
       <p>Sign in with your private coffee account.</p>
       <form id="auth-form">
-        <label>Email<input id="email" type="email" autocomplete="email" required></label>
+        <label>Email<input id="email" type="email" autocomplete="username" required></label>
         <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
         <button id="auth-submit" class="primary" type="submit">Sign in</button>
       </form>
+      <button id="auth-retry" class="primary" type="button" hidden>Try again</button>
       <p id="auth-error" class="error" role="alert" hidden></p>
     </section>
     <section id="app" hidden>
       <div id="notice" class="notice" role="status" hidden></div>
-      <section id="browse" aria-labelledby="browse-heading">
-        <div class="section-heading"><div><span class="eyebrow">Browse</span><h2 id="browse-heading">Coffee from Singapore roasters</h2></div><span id="published"></span></div>
-        <div class="filters">
-          <label class="search-label">Search<input id="search" type="search" placeholder="Bean, roaster, origin…"></label>
-          <label>Roaster<select id="roaster"><option value="">All roasters</option></select></label>
-          <label>Origin<select id="origin"><option value="">All origins</option></select></label>
-          <label>Process<select id="process"><option value="">All processes</option></select></label>
-          <label class="checkbox"><input id="stock" type="checkbox" checked> In stock</label>
-          <label class="checkbox"><input id="archived" type="checkbox"> Archived</label>
+      <section id="browse" aria-label="Browse coffee beans">
+        <div class="browse-toolbar">
+          <div><strong id="count"></strong><span id="published"></span></div>
+          <button id="open-filters" class="filter-trigger" type="button" aria-label="Open filters" aria-haspopup="dialog" aria-controls="filter-dialog">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4"/><circle cx="8" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+          </button>
         </div>
-        <p id="count" class="muted"></p>
         <div id="bean-list" class="bean-list"></div>
       </section>
       <section id="wishlist" aria-labelledby="wishlist-heading" hidden>
@@ -55,10 +62,52 @@
       </section>
     </section>
   </main>
+  <div id="filter-overlay" class="filter-overlay" hidden>
+    <div class="filter-backdrop"></div>
+    <section id="filter-dialog" class="filter-dialog" role="dialog" aria-modal="true" aria-labelledby="filter-title" tabindex="-1">
+      <header class="filter-header"><h2 id="filter-title">Filters</h2><button id="filter-close" class="filter-close" type="button" aria-label="Cancel and close filters">×</button></header>
+      <div class="filter-body">
+        <section class="filter-section"><h3>Search</h3><input id="filter-search" type="search" placeholder="Bean, roaster, origin…" aria-label="Search beans"></section>
+        <section class="filter-section"><h3>Vibe</h3>
+          <div class="vibe-graph">
+            <div id="filter-vibe" class="vibe-map" role="group" aria-label="Taste quadrants. Clean to funky left to right; bright to rich bottom to top."></div>
+            <svg class="vibe-axes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 9 50 H 91 M 9 50 L 14 47 M 9 50 L 14 53 M 91 50 L 86 47 M 91 50 L 86 53 M 50 9 V 91 M 50 9 L 47 14 M 50 9 L 53 14 M 50 91 L 47 86 M 50 91 L 53 86" fill="none" stroke="currentColor" stroke-width=".65" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="vibe-axis-end clean" aria-hidden="true">CLEAN</span><span class="vibe-axis-end funky" aria-hidden="true">FUNKY</span><span class="vibe-axis-end rich" aria-hidden="true">RICH</span><span class="vibe-axis-end bright" aria-hidden="true">BRIGHT</span>
+          </div>
+        </section>
+        <section class="filter-section"><h3>Price per 100g: <span id="filter-price-label">any</span></h3><input id="filter-price" type="range" min="5" max="60" step="1" value="60" aria-label="Maximum price per 100g"></section>
+        <section class="filter-section filter-checks"><label><input id="filter-stock" type="checkbox" checked>In stock only</label><label><input id="filter-archived" type="checkbox">Archived beans</label></section>
+        <section class="filter-section"><h3>Roast</h3>
+          <div id="filter-roast" class="roast-range"><div class="roast-slider"><div class="roast-track" aria-hidden="true"><div id="filter-roast-fill" class="roast-fill"></div></div><input id="filter-roast-min" type="range" min="0" max="2" step="1" value="0" aria-label="Minimum roast level"><input id="filter-roast-max" type="range" min="0" max="2" step="1" value="2" aria-label="Maximum roast level"></div><div class="roast-levels" aria-hidden="true"><span>Light</span><span>Medium</span><span>Dark</span></div><div id="filter-roast-selection" class="roast-selection">All roast levels</div></div>
+        </section>
+        <section class="filter-section"><h3>Process</h3><div id="filter-process" class="filter-chips"></div></section>
+        <section class="filter-section"><h3>Origin</h3><div id="filter-origins" class="origin-groups"></div></section>
+        <section class="filter-section"><h3>Roaster</h3><div id="filter-roasters" class="filter-options"></div></section>
+        <section class="filter-section"><h3>Sort</h3><div id="filter-sort" class="sort-options" role="radiogroup" aria-label="Sort beans"></div></section>
+      </div>
+      <footer class="filter-footer"><span id="filter-results" role="status"></span><div><button id="filter-cancel" type="button">Cancel</button><button id="filter-apply" class="primary" type="button">Apply</button></div></footer>
+    </section>
+  </div>
   <nav id="navigation" aria-label="Main navigation" hidden>
-    <button class="active" data-view="browse" type="button" aria-current="page">Browse</button>
-    <button data-view="wishlist" type="button">Wish list</button>
-    <button data-view="activity" type="button">Activity</button>
+    <button class="active" data-view="browse" type="button" aria-label="Browse" aria-current="page">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+        <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+        <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+      </svg>
+    </button>
+    <button data-view="wishlist" type="button" aria-label="Wish list">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20.8 8.4c0 4.5-8.8 10.7-8.8 10.7S3.2 12.9 3.2 8.4a4.5 4.5 0 0 1 8.8-1.2 4.5 4.5 0 0 1 8.8 1.2Z"/>
+      </svg>
+    </button>
+    <button data-view="activity" type="button" aria-label="Activity">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path class="nav-icon-detail" d="M12 6.5V12l3.7 2.3"/>
+      </svg>
+    </button>
   </nav>
 </body>
 </html>
