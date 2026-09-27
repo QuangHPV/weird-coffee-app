@@ -56,7 +56,7 @@ export function mountBacklog(root, adapter) {
       <div class="backlog-editor-head"><h3>${isBucket ? (bucket ? 'Edit bucket' : 'New bucket') : 'Edit task'}</h3><button class="backlog-icon-button" type="button" data-action="close-editor" aria-label="Close">×</button></div>
       <label>${isBucket ? 'Name' : 'Task'}<textarea name="title" maxlength="${isBucket ? 200 : 1000}" rows="${isBucket ? 2 : 3}" required>${escapeText(editing.text ?? (isBucket ? bucket?.title : item?.text) ?? '')}</textarea></label>
       ${isBucket ? `<label>Version <input name="version" maxlength="60" placeholder="Optional, e.g. 1.2" value="${escapeText(editing.version ?? bucket?.version ?? '')}"></label>
-        <div class="backlog-editor-label">Stage</div><div class="backlog-stage-choices">${STAGES.map(([key, label]) => `<button type="button" data-action="choose-stage" data-value="${key}" aria-pressed="${currentStage === key}">${label}</button>`).join('')}</div>` : `<label class="backlog-check-label"><input type="checkbox" name="note" ${item?.note ? 'checked' : ''}>Note (no checkbox)</label>
+        <div class="backlog-editor-label">Stage</div><div class="backlog-stage-choices">${STAGES.map(([key, label]) => `<button type="button" data-action="choose-stage" data-value="${key}" aria-pressed="${currentStage === key}">${label}</button>`).join('')}</div>` : `<label class="backlog-check-label"><input type="checkbox" name="note" ${editing.note ?? item?.note ? 'checked' : ''}>Note (no checkbox)</label>
         <div class="backlog-editor-label">Bucket</div><div class="backlog-targets">${buckets.map(value => `<button type="button" data-action="choose-target" data-value="${escapeText(value.id)}" aria-pressed="${(editing.targetId || bucket.id) === value.id}">${escapeText(value.title)}</button>`).join('')}</div>`}
       <div class="backlog-editor-actions">${(bucket && isBucket) || item ? '<button type="button" class="backlog-danger" data-action="delete-entry">Delete</button>' : ''}<button type="button" data-action="close-editor">Cancel</button><button class="backlog-primary" type="submit" ${busy ? 'disabled' : ''}>Save</button></div></form></div>`;
   }
@@ -84,6 +84,7 @@ export function mountBacklog(root, adapter) {
       return true;
     } catch (error) {
       if (error.conflict) {
+        editing = null;
         await reload();
         message = 'Backlog changed on another device. Latest changes are shown; try again.';
       } else message = error.message || 'Could not save the backlog.';
@@ -108,6 +109,7 @@ export function mountBacklog(root, adapter) {
       const form = root.querySelector('#backlogEditor');
       editing.text = form.elements.title.value;
       if (form.elements.version) editing.version = form.elements.version.value;
+      if (form.elements.note) editing.note = form.elements.note.checked;
       if (action === 'choose-stage') editing.stage = button.dataset.value;
       else editing.targetId = button.dataset.value;
       render(); return;
@@ -146,6 +148,9 @@ export function mountBacklog(root, adapter) {
     const current = editing;
     const version = form.elements.version?.value.trim() || '';
     const note = !!form.elements.note?.checked;
+    current.text = text;
+    current.version = version;
+    current.note = note;
     await mutate(buckets => {
       if (current.type === 'bucket') {
         const bucket = buckets.find(value => value.id === current.bucketId);
