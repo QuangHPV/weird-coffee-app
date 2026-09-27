@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/backlog-model.test.js",
+    "test:browser": "node tests/backlog-browser.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build --base=./ --outDir docs",
     "preview": "vite preview --host 127.0.0.1"

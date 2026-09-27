@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/src/style.css?direct"><link rel="stylesheet" href="/src/backlog-ui.css"></head><body><main><div class="backlog-shell" id="testRoot"></div></main><script type="module">
+import { mountBacklog } from '/src/backlog-ui.js';
+const task=(id,depth=0,done=false)=>({id,text:id,depth,done,note:false});
+const initial={document:{buckets:[{id:'a',title:'Plan',version:'2',stage:'collecting',items:[task('parent'),task('child',1),task('sibling')]},{id:'b',title:'Second bucket',version:'',stage:'collecting',items:[task('other')]}]},revision:1};
+window.fixture=structuredClone(initial);
+window.controller=mountBacklog(document.getElementById('testRoot'),{
+ load:async()=>structuredClone(window.fixture),
+ save:async(document,revision)=>{
+   await new Promise(resolve=>setTimeout(resolve,20));
+   if(window.failNext){window.failNext=false;throw new Error('Test connection interrupted');}
+   if(revision!==window.fixture.revision){const error=new Error('conflict');error.conflict=true;throw error;}
+   window.fixture={document,revision:revision+1};return structuredClone(window.fixture);
+ }
+});
+window.resetFixture=async()=>{window.fixture=structuredClone(initial);await window.controller.reload();};
+await window.controller.reload();
+</script></body></html>

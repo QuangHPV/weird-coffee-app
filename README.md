@@ -21,6 +21,17 @@ panel affect the list only after Apply; Cancel restores the previous selection.
 The fourth tab is the shared Backlog. It reads `public.backlog_state` and saves
 through the authenticated `save_backlog` function with a revision check. The Mac
 manager uses the same document. Apply `migrations/001_backlog.sql` to a new Neon
-branch before running this version there. New buckets start in Collecting; move
-them to Pending when ready for a work batch, then In progress and Done. Buckets
-can carry an optional version label, and tasks can move between buckets.
+branch before running this version there, followed by the remaining numbered
+migrations. New buckets start in Collecting. Queue selected tasks into the one
+Pending batch, then move that batch to In progress and Done. Versions belong
+in bucket names. Subtasks move and delete with their parent; checking a parent
+updates all of its children. More than 12 unfinished leaf tasks triggers a batch
+size warning. Use the grip to drag with a mouse or hold and drag on a phone.
+
+Run `npm test` for task-tree and batch logic. With the Vite dev server on port
+5173, `npm run test:browser` checks editing, checkboxes, deletion, and mouse/touch
+dragging in headless Chrome using sample data. Set `CHROME_BIN` when Chrome is
+installed elsewhere. Test fixtures are not included in the published build.
+
+The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and
+`src/backlog-ui.css` through its local server.
