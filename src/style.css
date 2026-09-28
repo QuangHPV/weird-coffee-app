@@ -130,3 +130,8 @@ nav#navigation{grid-template-columns:repeat(4,minmax(0,1fr))}
 nav#navigation button{min-width:0}
 #backlog{--text:#30251e;--panel:#fffdfa;--muted:#756d67;--line:#e5d9cd;--accent:#794a2a;--no:#a3372d}
 #backlog .backlog-shell{min-width:0;max-width:100%}
+
+.heart{display:grid;place-items:center;padding:8px;background:transparent;color:#9a7763;border-color:transparent}
+.heart svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.heart.saved{background:transparent;color:#be4542}.heart.saved svg{fill:currentColor}
+.heart:hover:not(:disabled){background:#fbe9e8;color:#a83030}.heart:focus-visible{outline:2px solid #704627;outline-offset:2px}

@@ -26,7 +26,12 @@ migrations. New buckets start in Collecting. Queue selected tasks into the one
 Pending batch, then move that batch to In progress and Done. Versions belong
 in bucket names. Subtasks move and delete with their parent; checking a parent
 updates all of its children. More than 12 unfinished leaf tasks triggers a batch
-size warning. Use the grip to drag with a mouse or hold and drag on a phone.
+size warning. Drag from a task row with a mouse, or hold and drag on a phone; children move
+with their parent even when collapsed. Double-click a task (or press Enter) to
+edit in place. Right-click or use the task menu to add a subtask, move, or delete.
+Parent carets collapse their children. Queuing removes tasks from Collecting and
+keeps their original bucket and parent path visible in the batch. Editors and
+delete confirmations stay inline.
 
 Run `npm test` for task-tree and batch logic. With the Vite dev server on port
 5173, `npm run test:browser` checks editing, checkboxes, deletion, and mouse/touch

@@ -52,6 +52,7 @@ export function moveTask(buckets, sourceId, itemId, targetId, anchorId = null, a
   const end = subtreeEnd(source.items, start);
   const moving = source.items.slice(start, end);
   if (moving.some(item => item.id === anchorId)) return;
+  if (source !== target && target.stage === 'pending') rememberSource(source, moving);
   const anchor = anchorId ? target.items.find(item => item.id === anchorId) : null;
   const depth = anchor?.depth || 0;
   const offset = depth - moving[0].depth;
@@ -84,10 +85,22 @@ export function queueBucket(buckets, sourceId) {
   const source = buckets.find(bucket => bucket.id === sourceId);
   const target = pendingBucket(buckets);
   if (source !== target) {
+    rememberSource(source, source.items);
     target.items.push(...source.items);
     source.items = [];
   }
   return target.id;
+}
+
+function rememberSource(bucket, moving) {
+  const ancestors = [];
+  for (const item of bucket.items) {
+    while (ancestors.length && ancestors.at(-1).depth >= item.depth) ancestors.pop();
+    if (moving.includes(item) && !item.sourcePath) {
+      item.sourcePath = [bucket.title, ...ancestors.map(parent => parent.text)];
+    }
+    ancestors.push(item);
+  }
 }
 
 export function batchSize(bucket) {

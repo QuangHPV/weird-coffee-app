@@ -66,3 +66,25 @@ test('batch warning counts remaining leaf work and ignores notes and completed t
   const value = bucket('batch', [task('parent'), ...Array.from({ length: BATCH_LIMIT + 1 }, (_, i) => task(`task-${i}`, 1)), task('note', 1, false, true), task('done', 0, true)]);
   assert.equal(batchSize(value), BATCH_LIMIT + 1);
 });
+
+test('queuing a nested subtree removes originals and preserves its source path through later moves', () => {
+  const buckets = [bucket('Ideas', [task('parent'), task('child', 1), task('grandchild', 2), task('sibling')]), bucket('Work', [], 'in_progress')];
+  const pendingId = queueTask(buckets, 'Ideas', 'child');
+  const pending = buckets.find(b => b.id === pendingId);
+  assert.deepEqual(buckets.find(b => b.id === 'Ideas').items.map(i => i.id), ['parent', 'sibling']);
+  assert.deepEqual(pending.items.map(i => [i.id, i.depth, i.sourcePath]), [
+    ['child', 0, ['Ideas', 'parent']], ['grandchild', 1, ['Ideas', 'parent', 'child']]
+  ]);
+  moveTask(buckets, pendingId, 'child', 'Work');
+  queueBucket(buckets, 'Work');
+  assert.deepEqual(pending.items[0].sourcePath, ['Ideas', 'parent']);
+  assert.equal(new Set(buckets.flatMap(b => b.items.map(i => i.id))).size, 4);
+});
+
+test('dragging directly into Pending records provenance and moving a parent after a sibling keeps children attached', () => {
+  const buckets = [bucket('Ideas', [task('parent'), task('child', 1), task('sibling')]), bucket('Next', [], 'pending')];
+  moveTask(buckets, 'Ideas', 'parent', 'Ideas', 'sibling', true);
+  assert.deepEqual(buckets[0].items.map(i => i.id), ['sibling', 'parent', 'child']);
+  moveTask(buckets, 'Ideas', 'parent', 'Next');
+  assert.deepEqual(buckets[1].items.map(i => i.sourcePath), [['Ideas'], ['Ideas', 'parent']]);
+});

@@ -114,6 +114,7 @@ function notice(message) {
 function updateNetwork() {
   $('network').textContent = demoMode ? 'Preview' : navigator.onLine ? 'Online' : 'Offline';
   $('network').classList.toggle('error', !demoMode && !navigator.onLine);
+  renderBrowse();
   renderWishlist();
 }
 window.addEventListener('online', () => { updateNetwork(); loadData(); });
@@ -404,8 +405,10 @@ function beanCard(bean) {
   const titleBox = node('div');
   titleBox.append(node('div', 'roaster', bean.roaster), node('div', 'bean-title', bean.title));
   const saved = ranking?.ids.includes(bean.id);
-  const heart = node('button', `heart${saved ? ' saved' : ''}`, saved ? '♥' : '♡');
+  const heart = node('button', `heart${saved ? ' saved' : ''}`);
+  heart.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 5.7a5.3 5.3 0 0 0-7.5 0L12 6.8l-1.1-1.1a5.3 5.3 0 0 0-7.5 7.5L12 21l8.6-7.8a5.3 5.3 0 0 0 0-7.5Z"/></svg>';
   heart.type = 'button';
+  heart.setAttribute('aria-pressed', String(!!saved));
   heart.setAttribute('aria-label', `${saved ? 'Remove from' : 'Add to'} Wish list: ${bean.title}`);
   heart.disabled = !ranking || saving || !navigator.onLine;
   heart.onclick = () => saveRanking(saved ? ranking.ids.filter(id => id !== bean.id) : [...ranking.ids, bean.id]);
