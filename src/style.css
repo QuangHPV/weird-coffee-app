@@ -135,3 +135,16 @@ nav#navigation button{min-width:0}
 .heart svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
 .heart.saved{background:transparent;color:#be4542}.heart.saved svg{fill:currentColor}
 .heart:hover:not(:disabled){background:#fbe9e8;color:#a83030}.heart:focus-visible{outline:2px solid #704627;outline-offset:2px}
+
+/* Taste meters: best guess inside its range; tap a row for the reason. */
+.taste{display:grid;gap:4px;margin:0 0 12px;padding-top:10px;border-top:1px solid #efe5da}
+.taste-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:4px 0;border:0;background:none;color:#786c61;font-size:.74rem;text-align:left;min-height:28px}
+button.taste-row:focus-visible{outline:2px solid #704627;outline-offset:2px;border-radius:6px}
+.taste-row>span:first-child{width:3.2rem}.taste-row>span:last-child{width:3.2rem;text-align:right}
+.taste-dots{display:inline-flex;gap:4px}
+.taste-dots i{width:10px;height:10px;border:1.5px solid #7a4a2a;border-radius:50%;opacity:.35}
+.taste-dots i.in-range{opacity:1;background:#7a4a2a47}
+.taste-dots i.point{opacity:1;background:#7a4a2a}
+.taste-why{display:grid;gap:4px;margin:2px 0 6px;padding:9px 11px;background:#f7f0e8;border-radius:10px;font-size:.78rem;line-height:1.45;color:#30251e}
+.taste-why b{font-size:.78rem}
+.taste-why blockquote{margin:2px 0 0;padding-left:8px;border-left:2px solid #dccdbd;color:#786c61;font-style:italic}

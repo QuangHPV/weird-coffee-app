@@ -72,7 +72,8 @@ let originGroups = [];
 const demoSnapshot = {
   beans: [
     { id: 'demo/01', roaster: 'Northline Coffee', title: 'Ethiopia Sidama', price: 24, grams: 250, per100g: 9.6, available: true, url: 'https://example.com', first_seen: '2026-09-26', label: { origins: ['Ethiopia'], process: ['Washed'], roast: 'light', funk: 1, body: 1, notes: ['Floral', 'Citrus'] } },
-    { id: 'demo/02', roaster: 'Daybreak Roasters', title: 'Colombia Huila', price: 27, grams: 250, per100g: 10.8, available: true, url: 'https://example.com', first_seen: '2026-09-25', label: { origins: ['Colombia'], process: ['Natural'], roast: 'medium', funk: 4, body: 2, notes: ['Berries', 'Cocoa'] } },
+    { id: 'demo/02', roaster: 'Daybreak Roasters', title: 'Colombia Huila', price: 27, grams: 250, per100g: 10.8, available: true, url: 'https://example.com', first_seen: '2026-09-25', label: { origins: ['Colombia'], process: ['Natural'], roast: 'medium', roast_range: ['light', 'medium'], funk: 4, funk_range: [3, 5], body: 2, notes: ['Berries', 'Cocoa'],
+      why: { funk: { reason: 'Natural process with berry notes; no fermentation details.', quotes: ['Natural'] }, roast: { reason: 'No roast stated.', quotes: [] } } } },
     { id: 'demo/03', roaster: 'Northline Coffee', title: 'Brazil Cerrado', price: 21, grams: 250, per100g: 8.4, available: true, url: 'https://example.com', first_seen: '2026-09-20', label: { origins: ['Brazil'], process: ['Pulped natural'], roast: 'dark', funk: 1, body: 4, notes: ['Caramel', 'Nuts'] } }
   ],
   runs: [
@@ -295,8 +296,10 @@ function matches(bean, filters, skipField = null) {
   if (bean.per100g && filters.max < 60 && bean.per100g > filters.max) return false;
   if (filters.vibeQuadrant && vibeQuadrantFor(bean.label) !== filters.vibeQuadrant) return false;
   if (filters.roastMin > 0 || filters.roastMax < ROAST_LEVELS.length - 1) {
-    const roast = ROAST_LEVELS.indexOf((bean.label?.roast || '').toLowerCase());
-    if (roast < filters.roastMin || roast > filters.roastMax) return false;
+    // A bean matches if any roast level in its range falls inside the slider.
+    const point = ROAST_LEVELS.indexOf((bean.label?.roast || '').toLowerCase());
+    const [lo, hi] = Array.isArray(bean.label?.roast_range) ? bean.label.roast_range.map(r => ROAST_LEVELS.indexOf(r)) : [point, point];
+    if (point < 0 || hi < filters.roastMin || lo > filters.roastMax) return false;
   }
   const search = filters.search.trim().toLowerCase();
   if (search && ![bean.title, bean.roaster, ...values(bean, 'origins'), ...values(bean, 'process'), ...(bean.label?.notes || [])]
@@ -399,6 +402,30 @@ function renderFilterPanel() {
   $('filter-results').textContent = `${count} ${count === 1 ? 'bean' : 'beans'}`;
 }
 
+// Best guess (solid dot) inside its range (shaded dots). Tap the row to read the reason and page quotes.
+function tasteMeter(left, right, size, point, range, why, title, names) {
+  const [lo, hi] = Array.isArray(range) ? range : [point, point];
+  const name = n => names ? names[n - 1] : n;
+  const span = lo === hi ? `${name(point)}` : `${name(point)}, range ${name(lo)} to ${name(hi)}`;
+  const row = node(why?.reason ? 'button' : 'div', 'taste-row');
+  const dots = node('span', 'taste-dots');
+  for (let n = 1; n <= size; n++) dots.append(node('i', n === point ? 'point' : n >= lo && n <= hi ? 'in-range' : ''));
+  dots.setAttribute('aria-label', `${title}: ${span}`);
+  row.append(node('span', '', left), dots, node('span', '', right));
+  const wrap = node('div', 'taste-meter');
+  wrap.append(row);
+  if (!why?.reason) return wrap;
+  row.type = 'button';
+  row.setAttribute('aria-expanded', 'false');
+  const pop = node('div', 'taste-why');
+  pop.hidden = true;
+  pop.append(node('b', '', `${title}: ${span}`), node('span', '', why.reason));
+  for (const q of why.quotes || []) pop.append(node('blockquote', '', `\u201c${q}\u201d`));
+  row.onclick = () => { pop.hidden = !pop.hidden; row.setAttribute('aria-expanded', String(!pop.hidden)); };
+  wrap.append(pop);
+  return wrap;
+}
+
 function beanCard(bean) {
   const card = node('article', 'bean-card');
   const top = node('div', 'bean-top');
@@ -423,7 +450,15 @@ function beanCard(bean) {
   footer.append(node('strong', '', bean.price == null ? 'Price unavailable' : `$${Number(bean.price).toFixed(2)} / ${bean.grams || '?'}g`));
   const link = safeLink(bean.url, 'View bean ↗');
   if (link) footer.append(link);
-  card.append(top, meta, footer);
+  const label = bean.label;
+  if (label && Number.isInteger(label.funk)) {
+    const roast = ROAST_LEVELS.indexOf((label.roast || '').toLowerCase()) + 1;
+    const taste = node('div', 'taste');
+    taste.append(tasteMeter('clean', 'funky', 5, label.funk, label.funk_range, label.why?.funk, 'Clean to funky'));
+    if (roast) taste.append(tasteMeter('light', 'dark', 3, roast, label.roast_range?.map(r => ROAST_LEVELS.indexOf(r) + 1),
+      label.why?.roast, 'Roast', ROAST_LEVELS));
+    card.append(top, meta, taste, footer);
+  } else card.append(top, meta, footer);
   return card;
 }
 
