@@ -167,3 +167,8 @@ button.taste-row:focus-visible{outline:2px solid #704627;outline-offset:2px;bord
 button.taste-row:focus-visible{outline:2px solid #704627}
 .taste-row:active{background:none}
 .wish-arrows button{background:#f1e8de;border:0;border-radius:9px;color:#704627;font-size:1.05rem;line-height:1}
+.wish-item.out{opacity:.5}
+.wish-item.out.wish-placeholder{opacity:.32}
+.wish-stock{display:flex;align-items:center;gap:7px;font-size:.78rem;font-weight:600;color:#76695f;white-space:nowrap}
+.wish-stock input{accent-color:#81532e;width:18px;height:18px;margin:0}
+.wish-stock span{font-weight:400;color:#897d72}

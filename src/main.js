@@ -74,7 +74,7 @@ const demoSnapshot = {
     { id: 'demo/01', roaster: 'Northline Coffee', title: 'Ethiopia Sidama', price: 24, grams: 250, per100g: 9.6, available: true, url: 'https://example.com', first_seen: '2026-09-26', label: { origins: ['Ethiopia'], process: ['Washed'], roast: 'light', funk: 1, body: 1, notes: ['Floral', 'Citrus'] } },
     { id: 'demo/02', roaster: 'Daybreak Roasters', title: 'Colombia Huila', price: 27, grams: 250, per100g: 10.8, available: true, url: 'https://example.com', first_seen: '2026-09-25', label: { origins: ['Colombia'], process: ['Natural'], roast: 'medium', roast_range: ['light', 'medium'], funk: 4, funk_range: [3, 5], body: 2, notes: ['Berries', 'Cocoa'],
       why: { funk: { reason: 'Natural process with berry notes; no fermentation details.', quotes: ['Natural'] }, roast: { reason: 'No roast stated.', quotes: [] } } } },
-    { id: 'demo/03', roaster: 'Northline Coffee', title: 'Brazil Cerrado', price: 21, grams: 250, per100g: 8.4, available: true, url: 'https://example.com', first_seen: '2026-09-20', label: { origins: ['Brazil'], process: ['Pulped natural'], roast: 'dark', funk: 1, body: 4, notes: ['Caramel', 'Nuts'] } }
+    { id: 'demo/03', roaster: 'Northline Coffee', title: 'Brazil Cerrado', price: 21, grams: 250, per100g: 8.4, available: false, url: 'https://example.com', first_seen: '2026-09-20', label: { origins: ['Brazil'], process: ['Pulped natural'], roast: 'dark', funk: 1, body: 4, notes: ['Caramel', 'Nuts'] } }
   ],
   runs: [
     { finished_at: '2026-09-26T10:00:00Z', source: 'daily', status: 'Completed', labeled_count: 2, events: [{ event: 'new', roaster: 'Northline Coffee', title: 'Ethiopia Sidama' }] },
@@ -142,7 +142,7 @@ function showSignedIn() {
 async function loadData() {
   if (demoMode) {
     snapshot = demoSnapshot;
-    ranking ||= { ids: ['demo/02', 'demo/01'], revision: 1 };
+    ranking ||= { ids: ['demo/02', 'demo/03', 'demo/01'], revision: 1 };
     $('published').textContent = 'Sample data';
     buildFilters();
     render();
@@ -483,9 +483,13 @@ function renderWishlist() {
   const status = !navigator.onLine ? 'Offline. Reconnect before editing your Wish list.' : saving ? 'Saving…' : '';
   $('wish-status').textContent = status;
   $('wish-status').hidden = !status;
-  const items = ranking.ids.map((id, index) => {
+  wishShown = shownWishIds(byId);
+  $('wish-in-stock').checked = wishInStockOnly;
+  const hidden = ranking.ids.length - wishShown.length;
+  $('wish-hidden').textContent = hidden ? `${hidden} hidden` : '';
+  const items = wishShown.map((id, index) => {
     const bean = byId.get(id);
-    const item = node('li', 'wish-item');
+    const item = node('li', `wish-item${bean && (!bean.available || bean.gone) ? ' out' : ''}`);
     item.dataset.id = id;
     // Rank bar: position and grip on the left, move arrows on the right.
     const bar = node('div', 'wish-bar');
@@ -500,7 +504,7 @@ function renderWishlist() {
     up.onclick = () => move(index, -1);
     const down = node('button', '', '↓');
     down.type = 'button'; down.title = 'Move down'; down.setAttribute('aria-label', `Move ${bean?.title || id} down`);
-    down.disabled = index === ranking.ids.length - 1 || saving || !navigator.onLine;
+    down.disabled = index === wishShown.length - 1 || saving || !navigator.onLine;
     down.onclick = () => move(index, 1);
     arrows.append(up, down);
     bar.append(grip, arrows);
@@ -519,8 +523,32 @@ function renderWishlist() {
     return item;
   });
   $('wish-list').replaceChildren(...items);
-  if (!items.length) $('wish-list').append(node('li', 'wish-empty', 'No saved beans yet.'));
+  if (!items.length) $('wish-list').append(node('li', 'wish-empty', ranking.ids.length ? 'Nothing in stock.' : 'No saved beans yet.'));
 }
+
+// With "In stock only" on, sold-out and gone beans are hidden but keep their place in the saved order.
+let wishInStockOnly = false;
+try { wishInStockOnly = localStorage.getItem('wishInStockOnly') === 'true'; } catch {}
+let wishShown = [];
+
+function shownWishIds(byId) {
+  if (!wishInStockOnly) return ranking.ids;
+  return ranking.ids.filter(id => { const bean = byId.get(id); return !bean || (bean.available && !bean.gone); });
+}
+
+// Put a new order of the shown beans back into the full list; hidden beans stay where they are.
+function mergeShownOrder(order) {
+  const shown = new Set(order);
+  let next = 0;
+  return ranking.ids.map(id => shown.has(id) ? order[next++] : id);
+}
+
+$('wish-in-stock').checked = wishInStockOnly;
+$('wish-in-stock').onchange = event => {
+  wishInStockOnly = event.target.checked;
+  try { localStorage.setItem('wishInStockOnly', String(wishInStockOnly)); } catch {}
+  renderWishlist();
+};
 
 let pendingWishDrag = null;
 let activeWishDrag = null;
@@ -587,7 +615,7 @@ function finishWishDrag(save) {
   drag.ghost.remove();
   drag.item.classList.remove('wish-placeholder');
   document.body.classList.remove('wish-reordering');
-  const ids = [...wishList.querySelectorAll(':scope > .wish-item')].map(item => item.dataset.id);
+  const ids = mergeShownOrder([...wishList.querySelectorAll(':scope > .wish-item')].map(item => item.dataset.id));
   if (save && ids.some((id, index) => id !== ranking.ids[index])) saveRanking(ids);
   else renderWishlist();
 }
@@ -630,9 +658,9 @@ window.addEventListener('pointercancel', () => { if ((activeWishDrag || pendingW
 wishList.addEventListener('contextmenu', event => { if (activeWishDrag) event.preventDefault(); });
 
 function move(index, direction) {
-  const ids = [...ranking.ids];
-  [ids[index], ids[index + direction]] = [ids[index + direction], ids[index]];
-  saveRanking(ids);
+  const order = [...wishShown];
+  [order[index], order[index + direction]] = [order[index + direction], order[index]];
+  saveRanking(mergeShownOrder(order));
 }
 
 async function saveRanking(ids) {
