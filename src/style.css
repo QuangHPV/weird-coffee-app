@@ -148,3 +148,22 @@ button.taste-row:focus-visible{outline:2px solid #704627;outline-offset:2px;bord
 .taste-why{display:grid;gap:4px;margin:2px 0 6px;padding:9px 11px;background:#f7f0e8;border-radius:10px;font-size:.78rem;line-height:1.45;color:#30251e}
 .taste-why b{font-size:.78rem}
 .taste-why blockquote{margin:2px 0 0;padding-left:8px;border-left:2px solid #dccdbd;color:#786c61;font-style:italic}
+
+/* Wish list rows reuse the Browse card under a rank bar. */
+.wish-item{display:block;padding:0;overflow:hidden}
+.wish-bar{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 16px;border-bottom:1px solid #efe5da;background:#faf5ee}
+.wish-position{margin-right:auto;font-size:1.35rem;font-weight:800;color:#a8683f;font-variant-numeric:tabular-nums}
+.wish-grip{display:grid;place-items:center;width:26px;height:30px;color:#a89888}
+.wish-grip svg{width:12px;height:17px;fill:currentColor}
+.wish-arrows{display:flex;gap:6px}
+.wish-arrows button{width:34px;min-height:34px}
+.wish-item .bean-card{border:0;border-radius:0;box-shadow:none;background:none}
+.wish-missing{padding:16px;display:grid;gap:4px;justify-items:start}
+.wish-missing p{margin:0;font-size:.74rem;overflow-wrap:anywhere}
+.wish-missing .link-button{padding:6px 0}
+/* No flashing highlight on taps. */
+*{-webkit-tap-highlight-color:transparent}
+.taste-row{-webkit-user-select:none;user-select:none;touch-action:manipulation;outline:none}
+button.taste-row:focus-visible{outline:2px solid #704627}
+.taste-row:active{background:none}
+.wish-arrows button{background:#f1e8de;border:0;border-radius:9px;color:#704627;font-size:1.05rem;line-height:1}

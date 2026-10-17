@@ -487,13 +487,12 @@ function renderWishlist() {
     const bean = byId.get(id);
     const item = node('li', 'wish-item');
     item.dataset.id = id;
-    item.append(node('span', 'wish-position', index + 1));
-    const copy = node('div', 'wish-copy');
-    copy.append(node('div', 'roaster', bean?.roaster || 'Unavailable listing'),
-                node('div', 'bean-title', bean?.title || id));
-    if (bean) copy.append(node('p', '', `${(bean.label?.origins || []).join(', ') || 'Origin not stated'} · $${Number(bean.price || 0).toFixed(2)}${bean.archived ? ' · Archived' : ''}`));
-    item.append(copy);
-    const actions = node('div', 'wish-actions');
+    // Rank bar: position and grip on the left, move arrows on the right.
+    const bar = node('div', 'wish-bar');
+    bar.append(node('span', 'wish-position', index + 1));
+    const grip = node('span', 'wish-grip');
+    grip.innerHTML = '<svg viewBox="0 0 12 18" aria-hidden="true"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/><circle cx="3" cy="15" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg>';
+    grip.title = 'Press and hold to drag';
     const arrows = node('div', 'wish-arrows');
     const up = node('button', '', '↑');
     up.type = 'button'; up.title = 'Move up'; up.setAttribute('aria-label', `Move ${bean?.title || id} up`);
@@ -503,15 +502,20 @@ function renderWishlist() {
     down.type = 'button'; down.title = 'Move down'; down.setAttribute('aria-label', `Move ${bean?.title || id} down`);
     down.disabled = index === ranking.ids.length - 1 || saving || !navigator.onLine;
     down.onclick = () => move(index, 1);
-    const remove = node('button', 'wish-remove');
-    remove.type = 'button'; remove.disabled = saving || !navigator.onLine;
-    remove.setAttribute('aria-label', `Remove ${bean?.title || id} from Wish list`);
-    remove.title = 'Remove from Wish list';
-    remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.4c0 4.5-8.8 10.7-8.8 10.7S3.2 12.9 3.2 8.4a4.5 4.5 0 0 1 8.8-1.2 4.5 4.5 0 0 1 8.8 1.2Z"/></svg>';
-    remove.onclick = () => saveRanking(ranking.ids.filter(value => value !== id));
     arrows.append(up, down);
-    actions.append(arrows, remove);
-    item.append(actions);
+    bar.append(grip, arrows);
+    item.append(bar);
+    if (bean) item.append(beanCard(bean));
+    else {
+      // The listing is gone from the data; the heart on a normal card is not available.
+      const missing = node('div', 'wish-missing');
+      missing.append(node('div', 'bean-title', 'Listing no longer available'), node('p', 'muted', id));
+      const remove = node('button', 'link-button', 'Remove from Wish list');
+      remove.type = 'button'; remove.disabled = saving || !navigator.onLine;
+      remove.onclick = () => saveRanking(ranking.ids.filter(value => value !== id));
+      missing.append(remove);
+      item.append(missing);
+    }
     return item;
   });
   $('wish-list').replaceChildren(...items);

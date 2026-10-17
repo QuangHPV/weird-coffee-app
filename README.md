@@ -42,3 +42,5 @@ The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and
 `src/backlog-ui.css` through its local server.
 
 Bean cards show clean–funky and light–dark as a solid dot inside shaded range dots; tap a row to read the reason and page quotes. The roast slider and vibe quadrants filter on the best guess, not the range.
+
+The Wish list reuses the Browse card under a rank bar (position, move arrows). Press and hold a card to drag it. Tap targets have no tap-highlight flash.
