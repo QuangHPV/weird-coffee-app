@@ -296,10 +296,8 @@ function matches(bean, filters, skipField = null) {
   if (bean.per100g && filters.max < 60 && bean.per100g > filters.max) return false;
   if (filters.vibeQuadrant && vibeQuadrantFor(bean.label) !== filters.vibeQuadrant) return false;
   if (filters.roastMin > 0 || filters.roastMax < ROAST_LEVELS.length - 1) {
-    // A bean matches if any roast level in its range falls inside the slider.
-    const point = ROAST_LEVELS.indexOf((bean.label?.roast || '').toLowerCase());
-    const [lo, hi] = Array.isArray(bean.label?.roast_range) ? bean.label.roast_range.map(r => ROAST_LEVELS.indexOf(r)) : [point, point];
-    if (point < 0 || hi < filters.roastMin || lo > filters.roastMax) return false;
+    const roast = ROAST_LEVELS.indexOf((bean.label?.roast || '').toLowerCase());
+    if (roast < filters.roastMin || roast > filters.roastMax) return false;
   }
   const search = filters.search.trim().toLowerCase();
   if (search && ![bean.title, bean.roaster, ...values(bean, 'origins'), ...values(bean, 'process'), ...(bean.label?.notes || [])]
