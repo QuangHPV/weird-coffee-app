@@ -40,3 +40,5 @@ installed elsewhere. Test fixtures are not included in the published build.
 
 The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and
 `src/backlog-ui.css` through its local server.
+
+Bean cards show clean–funky and light–dark as a solid dot inside shaded range dots; tap a row to read the reason and page quotes. The roast filter matches a bean when its roast range overlaps the slider, while the vibe quadrants use the best guess.
