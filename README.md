@@ -1,4 +1,4 @@
-# Coffee mobile
+# Another Cup mobile
 
 This repository contains only the installable mobile web app. The Mac coffee
 manager, its local database, labels, and publishing credential stay on the Mac.
