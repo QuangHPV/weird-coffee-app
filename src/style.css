@@ -153,8 +153,6 @@ button.taste-row:focus-visible{outline:2px solid #704627;outline-offset:2px;bord
 .wish-item{display:block;padding:0;overflow:hidden}
 .wish-bar{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 16px;border-bottom:1px solid #efe5da;background:#faf5ee}
 .wish-position{margin-right:auto;font-size:1.35rem;font-weight:800;color:#a8683f;font-variant-numeric:tabular-nums}
-.wish-grip{display:grid;place-items:center;width:26px;height:30px;color:#a89888}
-.wish-grip svg{width:12px;height:17px;fill:currentColor}
 .wish-arrows{display:flex;gap:6px}
 .wish-arrows button{width:34px;min-height:34px}
 .wish-item .bean-card{border:0;border-radius:0;box-shadow:none;background:none}

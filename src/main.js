@@ -487,12 +487,9 @@ function renderWishlist() {
     const bean = byId.get(id);
     const item = node('li', `wish-item${bean && (!bean.available || bean.gone) ? ' out' : ''}`);
     item.dataset.id = id;
-    // Rank bar: position and grip on the left, move arrows on the right.
+    // Rank bar: position on the left, move arrows on the right. Press and hold the card to drag.
     const bar = node('div', 'wish-bar');
     bar.append(node('span', 'wish-position', index + 1));
-    const grip = node('span', 'wish-grip');
-    grip.innerHTML = '<svg viewBox="0 0 12 18" aria-hidden="true"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/><circle cx="3" cy="15" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg>';
-    grip.title = 'Press and hold to drag';
     const arrows = node('div', 'wish-arrows');
     const up = node('button', '', '↑');
     up.type = 'button'; up.title = 'Move up'; up.setAttribute('aria-label', `Move ${bean?.title || id} up`);
@@ -503,7 +500,7 @@ function renderWishlist() {
     down.disabled = index === wishShown.length - 1 || saving || !navigator.onLine;
     down.onclick = () => move(index, 1);
     arrows.append(up, down);
-    bar.append(grip, arrows);
+    bar.append(arrows);
     item.append(bar);
     if (bean) item.append(beanCard(bean));
     else {
