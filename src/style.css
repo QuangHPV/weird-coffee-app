@@ -172,3 +172,8 @@ button.taste-row:focus-visible{outline:2px solid #704627}
 .wish-stock{display:flex;align-items:center;gap:7px;font-size:.78rem;font-weight:600;color:#76695f;white-space:nowrap}
 .wish-stock input{accent-color:#81532e;width:18px;height:18px;margin:0}
 .wish-stock span{font-weight:400;color:#897d72}
+
+/* App feel: no text selection, selection popup or long-press menu, except in text fields. */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+img,a{-webkit-user-drag:none}

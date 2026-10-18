@@ -651,6 +651,8 @@ window.addEventListener('pointermove', event => {
 });
 window.addEventListener('pointerup', () => { if ((activeWishDrag || pendingWishDrag)?.kind === 'mouse') finishWishDrag(true); });
 window.addEventListener('pointercancel', () => { if ((activeWishDrag || pendingWishDrag)?.kind === 'mouse') finishWishDrag(false); });
+// Long-press opens the browser menu (copy, search, open link); keep it for text fields only.
+document.addEventListener('contextmenu', event => { if (!event.target.closest('input, textarea')) event.preventDefault(); });
 wishList.addEventListener('contextmenu', event => { if (activeWishDrag) event.preventDefault(); });
 
 function move(index, direction) {
