@@ -18,28 +18,9 @@ server and is not included in the GitHub Pages build.
 Browse filters open from the icon beside the bean count. Changes in the filter
 panel affect the list only after Apply; Cancel restores the previous selection.
 
-The fourth tab is the shared Backlog. It reads `public.backlog_state` and saves
-through the authenticated `save_backlog` function with a revision check. The Mac
-manager uses the same document. Apply `migrations/001_backlog.sql` to a new Neon
-branch before running this version there, followed by the remaining numbered
-migrations. New buckets start in Collecting. Queue selected tasks into the one
-Pending batch, then move that batch to In progress and Done. Versions belong
-in bucket names. Subtasks move and delete with their parent; checking a parent
-updates all of its children. More than 12 unfinished leaf tasks triggers a batch
-size warning. Drag from a task row with a mouse, or hold and drag on a phone; children move
-with their parent even when collapsed. Double-click a task (or press Enter) to
-edit in place. Right-click or use the task menu to add a subtask, move, or delete.
-Parent carets collapse their children. Queuing removes tasks from Collecting and
-keeps their original bucket and parent path visible in the batch. Editors and
-delete confirmations stay inline.
+The fourth tab is the shared Backlog: a TODO list and a Completed list, each grouped by day, newest first. It reads `public.backlog_state` and saves through the authenticated `save_backlog` function with a revision check. The Mac manager uses the same document (`{"tasks": [{id, text, created, done_at}]}`). Apply `migrations/001_backlog.sql` to a new Neon branch before running this version there, followed by the remaining numbered migrations (`004_two_lists.sql` is the current shape). The only controls on a task are a tickbox and a trashcan (tap twice to delete); the first line of a message is its title and `#tags` are highlighted.
 
-Run `npm test` for task-tree and batch logic. With the Vite dev server on port
-5173, `npm run test:browser` checks editing, checkboxes, deletion, and mouse/touch
-dragging in headless Chrome using sample data. Set `CHROME_BIN` when Chrome is
-installed elsewhere. Test fixtures are not included in the published build.
-
-The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and
-`src/backlog-ui.css` through its local server.
+Run `npm test` for the task helpers. The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and `src/backlog-ui.css` through its local server.
 
 Bean cards show clean–funky and light–dark as a solid dot inside shaded range dots; tap a row to read the reason and page quotes. The roast slider and vibe quadrants filter on the best guess, not the range.
 
