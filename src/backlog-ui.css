@@ -1,12 +1,13 @@
-.backlog-shell{max-width:1040px;margin:0 auto;padding:8px 0 60px;color:var(--text,#28231e)}
+.backlog-shell{max-width:720px;margin:0 auto;padding:8px 0 60px;color:var(--text,#28231e)}
 .backlog-shell button{cursor:pointer}.backlog-shell button:disabled{opacity:.45;cursor:default}
 .backlog-shell button:focus-visible,.backlog-shell input:focus-visible,.backlog-shell textarea:focus-visible{outline:2px solid var(--accent,#8d543e);outline-offset:2px}
 .backlog-message{color:var(--no,#a43f3f);font-size:13px;margin:0 0 12px}.backlog-message:empty{display:none}
 .backlog-loading{padding:30px;text-align:center;color:var(--muted,#786c63)}
-.backlog-lists{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:34px;align-items:start}
+.backlog-tabs{display:flex;gap:6px;margin:0 0 16px;border-bottom:1px solid var(--line,#ddd0c4);padding-bottom:10px}
+.backlog-tabs button{border:0;border-radius:8px;background:transparent;color:var(--muted,#786c63);padding:8px 13px;font:inherit;font-size:14px;font-weight:650}
+.backlog-tabs button.active{background:var(--accent,#8d543e);color:var(--panel,#fff)}
+.backlog-tabs span{margin-left:7px;font-size:12px;opacity:.75}
 .backlog-list{min-width:0}
-.backlog-list h3{display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:19px}
-.backlog-list h3 span{font-size:12px;font-weight:600;color:var(--muted,#786c63);background:color-mix(in srgb,var(--line,#ddd0c4) 55%,transparent);border-radius:999px;padding:1px 8px}
 .backlog-add{display:flex;gap:8px;align-items:flex-start;margin-bottom:22px}
 .backlog-add textarea{flex:1;min-width:0;box-sizing:border-box;resize:none;overflow:hidden;max-height:220px;background:var(--panel,#fff);color:inherit;border:1px solid var(--line,#ddd0c4);border-radius:9px;padding:9px 11px;font:inherit;font-size:14px;line-height:1.45}
 .backlog-add button{border:0;border-radius:9px;padding:9px 15px;background:var(--accent,#8d543e);color:var(--panel,#fff);font:inherit;font-size:14px;font-weight:650}
@@ -26,4 +27,4 @@
 .backlog-trash svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .backlog-trash:hover:not(:disabled),.backlog-trash.armed{color:var(--no,#a43f3f);background:color-mix(in srgb,var(--no,#a43f3f) 10%,transparent)}
 .backlog-empty{margin:0;padding:26px;border:1px dashed var(--line,#ddd0c4);border-radius:10px;text-align:center;color:var(--muted,#786c63);font-size:13px}
-@media(max-width:700px){.backlog-lists{grid-template-columns:minmax(0,1fr);gap:28px}.backlog-add textarea{font-size:16px}}
+@media(max-width:700px){.backlog-add textarea{font-size:16px}}

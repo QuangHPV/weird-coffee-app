@@ -10,7 +10,7 @@ const timeLabel = stamp => hasTime(stamp) ? new Date(stamp).toLocaleTimeString('
 const toState = result => ({ ...result, document: normalizeDocument(result.document), revision: Number(result.revision) });
 
 export function mountBacklog(root, adapter) {
-  let state = null, busy = false, loading = false, message = '', draft = '', armed = null, armTimer = null;
+  let state = null, tab = 'todo', busy = false, loading = false, message = '', draft = '', armed = null, armTimer = null;
   const disabled = () => busy || loading || state?.synced === false;
 
   function renderTask(task, field) {
@@ -32,7 +32,7 @@ export function mountBacklog(root, adapter) {
     const groups = groupByDay(tasks, field).map(group => `<div class="backlog-group">
       <h4 class="backlog-day">${escapeText(dayLabel(group.day))}</h4>
       <ul class="backlog-tasks">${group.tasks.map(task => renderTask(task, field)).join('')}</ul></div>`).join('');
-    return `<section class="backlog-list" aria-label="${name}"><h3>${name}<span>${tasks.length}</span></h3>
+    return `<section class="backlog-list" role="tabpanel" aria-label="${name}">
       ${name === 'TODO' ? `<form class="backlog-add"><textarea name="text" rows="1" maxlength="2000" aria-label="New TODO"
         placeholder="Add a TODO. #tags are highlighted." ${disabled() ? 'disabled' : ''}>${escapeText(draft)}</textarea>
         <button type="submit" ${disabled() ? 'disabled' : ''}>Add</button></form>` : ''}
@@ -44,10 +44,13 @@ export function mountBacklog(root, adapter) {
       root.innerHTML = `<div class="backlog-loading" role="status">${escapeText(message || 'Loading backlog…')}</div>${message ? '<button type="button" data-action="retry">Retry</button>' : ''}`;
       return;
     }
-    const tasks = state.document.tasks;
-    root.innerHTML = `<div class="backlog-message" role="status">${escapeText(message || (state.synced === false ? 'Offline copy. Reconnect to edit.' : ''))}</div>
-      <div class="backlog-lists">${renderList('TODO', tasks.filter(task => task.done_at == null), 'created', 'Nothing to do.')}
-      ${renderList('Completed', tasks.filter(task => task.done_at != null), 'done_at', 'Nothing completed yet.')}</div>`;
+    const todo = state.document.tasks.filter(task => task.done_at == null);
+    const completed = state.document.tasks.filter(task => task.done_at != null);
+    const tabs = [['todo', 'TODO', todo], ['completed', 'Completed', completed]];
+    root.innerHTML = `<div class="backlog-tabs" role="tablist" aria-label="Backlog lists">${tabs.map(([key, name, list]) =>
+        `<button type="button" role="tab" data-tab="${key}" aria-selected="${tab === key}" class="${tab === key ? 'active' : ''}">${name}<span>${list.length}</span></button>`).join('')}</div>
+      <div class="backlog-message" role="status">${escapeText(message || (state.synced === false ? 'Offline copy. Reconnect to edit.' : ''))}</div>
+      ${tab === 'todo' ? renderList('TODO', todo, 'created', 'Nothing to do.') : renderList('Completed', completed, 'done_at', 'Nothing completed yet.')}`;
     autosize();
   }
 
@@ -99,6 +102,8 @@ export function mountBacklog(root, adapter) {
   }
 
   root.addEventListener('click', event => {
+    const tabButton = event.target.closest('[data-tab]');
+    if (tabButton) { disarm(); tab = tabButton.dataset.tab; render(); return; }
     const button = event.target.closest('[data-action]');
     if (armed && button?.dataset.action !== 'delete') { disarm(); render(); }
     if (button?.dataset.action === 'retry') reload();

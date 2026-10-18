@@ -18,7 +18,7 @@ server and is not included in the GitHub Pages build.
 Browse filters open from the icon beside the bean count. Changes in the filter
 panel affect the list only after Apply; Cancel restores the previous selection.
 
-The fourth tab is the shared Backlog: a TODO list and a Completed list, each grouped by day, newest first. It reads `public.backlog_state` and saves through the authenticated `save_backlog` function with a revision check. The Mac manager uses the same document (`{"tasks": [{id, text, created, done_at}]}`). Apply `migrations/001_backlog.sql` to a new Neon branch before running this version there, followed by the remaining numbered migrations (`004_two_lists.sql` is the current shape). The only controls on a task are a tickbox and a trashcan (tap twice to delete); the first line of a message is its title and `#tags` are highlighted.
+The fourth tab is the shared Backlog: a TODO list and a Completed list (two sub-tabs), each grouped by day, newest first. It reads `public.backlog_state` and saves through the authenticated `save_backlog` function with a revision check. The Mac manager uses the same document (`{"tasks": [{id, text, created, done_at}]}`). Apply `migrations/001_backlog.sql` to a new Neon branch before running this version there, followed by the remaining numbered migrations (`004_two_lists.sql` is the current shape). The only controls on a task are a tickbox and a trashcan (tap twice to delete); the first line of a message is its title and `#tags` are highlighted.
 
 Run `npm test` for the task helpers. The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and `src/backlog-ui.css` through its local server.
 
