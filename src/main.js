@@ -14,14 +14,10 @@ let snapshot = null;
 let ranking = null;
 let saving = false;
 let view = 'browse';
-let demoBacklog = { document: { buckets: [
-  { id: 'sample-1', title: 'Next mobile polish', stage: 'pending', version: 'v1.1', items: [
-    { id: 'sample-task-1', text: 'Refine the Browse cards', done: false, note: false, depth: 0 },
-    { id: 'sample-task-2', text: 'Review spacing on a phone', done: true, note: false, depth: 0 }
-  ] },
-  { id: 'sample-2', title: 'Ideas to collect', stage: 'collecting', version: '', items: [
-    { id: 'sample-task-3', text: 'Add more roasters', done: false, note: false, depth: 0 }
-  ] }
+let demoBacklog = { document: { tasks: [
+  { id: 'sample-1', text: 'Refine the Browse cards #mobile\nCheck spacing on a phone.', created: '2026-10-18T09:30:00.000Z', done_at: null },
+  { id: 'sample-2', text: 'Add more roasters #catalog', created: '2026-10-17T02:10:00.000Z', done_at: null },
+  { id: 'sample-3', text: 'Review spacing on a phone #mobile', created: '2026-10-16T08:00:00.000Z', done_at: '2026-10-17T06:45:00.000Z' }
 ] }, revision: 1 };
 const backlog = mountBacklog($('backlog-root'), {
   async load() {
