@@ -175,3 +175,92 @@ button.taste-row:focus-visible{outline:2px solid #704627}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text}
 img,a{-webkit-user-drag:none}
+
+/* Dragging a Browse card into the Wish list */
+.add-chip { position: fixed; left: 16px; right: 16px; z-index: 20; display: grid; gap: 1px; padding: 9px 14px; border-radius: 12px; background: #794a2a; color: #fffdfa; pointer-events: none; box-shadow: 0 14px 28px #49321b30; }
+.add-chip .roaster { color: #fffdfacc; }
+.add-chip b { font-size: .95rem; line-height: 1.25; }
+.wish-adding .wish-drop-hint { padding: 22px 16px; text-align: center; font-size: .8rem; color: #8b6954; }
+.wish-adding { opacity: .6; }
+
+/* Dark mode follows the phone's appearance. Each rule repeats a rule above with its colors flipped, so edit both together. */
+@media (prefers-color-scheme: dark) {
+  :root { color-scheme: dark; }
+  :root { color: #d1c3ba; background: #17120f; }
+  a { color: #cca284; }
+  .eyebrow { color: #a38472; }
+  .muted { color: #928a85; }
+  .error { color: #c6645b; }
+  .topbar { background: #17120ff2; border-bottom: 1px solid #433524; }
+  .toptools { color: #948b83; }
+  .toptools button,.link-button { color: #cca284; }
+  .section-heading>span { color: #887e75; }
+  .filters label,.auth-panel label { color: #998d84; }
+  .filters input:not([type=checkbox]),.filters select,.auth-panel input { border: 1px solid #4b3d2d; background: #221b16; color: #d1c3ba; outline-color: #bf8a64; }
+  .filters .checkbox { border: 1px solid #4b3d2d; background: #221b16; }
+  .checkbox input { accent-color: #c59977; }
+  .bean-card,.wish-item,.run,.auth-panel { background: #221b16; border: 1px solid #413426; }
+  .roaster { color: #b4876a; }
+  .heart { border: 1px solid #493927; background: #2f2010; color: #c49d7d; }
+  .heart.saved { background: #c18e70; }
+  .pill { background: #36291b; color: #b39f91; }
+  .pill.out { background: #351714; color: #bd635c; }
+  .bean-footer { color: #978c82; }
+  .bean-footer strong { color: #d0c1b8; }
+  .notice { border: 1px solid #60492c; background: #3e2a05; color: #c4a98c; }
+  .wish-position { color: #a57655; }
+  .wish-copy p { color: #968b81; }
+  .wish-actions button { background: #2f2213; color: #cca284; }
+  .run small { color: #8d8279; }
+  .run p { color: #998e85; }
+  .auth-panel p { color: #968d85; }
+  .primary { background: #c99b7d; color: #141414; }
+  nav { border-top: 1px solid #433426; background: #221b16ee; }
+  nav button { color: #938a82; }
+  nav button.active { background: #3f2d1b; color: #cca284; }
+  @media(min-width:700px) {
+    nav { border: 1px solid #433426; }
+  }
+  nav button.active { color: #cca284; }
+  nav button:focus-visible { outline: 2px solid #cca284; }
+  nav button.active .nav-icon-detail { stroke: #2a1a03; }
+  :root { --filter-text: #cec5c0; --filter-muted: #837a74; --filter-line: #342c24; --filter-accent: #c99b7c; --filter-panel: #221b16; --filter-yes: #7ac498; --filter-yes-bg: #1a3121; --filter-no: #ba544f; --filter-no-bg: #361411; --q-clean-rich-bg: #3e2d1c; --q-clean-rich-fg: #c59b82; --q-clean-rich-active: #b2876d; --q-funky-rich-bg: #34222d; --q-funky-rich-fg: #b189a1; --q-funky-rich-active: #a57a93; --q-clean-bright-bg: #21352c; --q-clean-bright-fg: #94beaf; --q-clean-bright-active: #7aa796; --q-funky-bright-bg: #341b21; --q-funky-bright-fg: #b57d91; --q-funky-bright-active: #a46477; }
+  .browse-toolbar span { color: #887e75; }
+  .filter-trigger { border: 1px solid #4b3d2d; background: #221b16; color: #cca284; }
+  .filter-trigger.has-filters::after { background: #cca284; }
+  .filter-backdrop { background: #21180fb0; }
+  .filter-dialog input[type=checkbox]::after { border: solid #2e1b04; }
+  .vibe-cell.active { color: #2d1604; }
+  .sort-option.selected { background: #352818; }
+  .filter-footer button.primary { color: #141414; }
+  .toptools #signout { border: 1px solid #4b3d2d; background: #221b16; color: #cca284; }
+  .toptools #signout:focus-visible { outline: 2px solid #cca284; }
+  .wish-actions .wish-remove { color: #b04b49; }
+  .wish-actions .wish-remove:hover { background: #320f0d; color: #c35757; }
+  .wish-actions .wish-remove:focus-visible, .wish-arrows button:focus-visible { outline: 2px solid #cca284; }
+  .wish-empty { color: #928a85; }
+  #backlog { --text: #d1c3ba; --panel: #221b16; --muted: #928a85; --line: #413426; --accent: #c99b7d; --no: #c6645b; }
+  .heart { color: #957767; }
+  .heart.saved { color: #b04b49; }
+  .heart:hover:not(:disabled) { background: #320f0d; color: #c35757; }
+  .heart:focus-visible { outline: 2px solid #cca284; }
+  .taste { border-top: 1px solid #382b1c; }
+  .taste-row { color: #978c82; }
+  button.taste-row:focus-visible { outline: 2px solid #cca284; }
+  .taste-dots i { border: 1.5px solid #c99b7c; }
+  .taste-dots i.in-range { background: #c99b7c47; }
+  .taste-dots i.point { background: #c99b7c; }
+  .taste-why { background: #2f2213; color: #d1c3ba; }
+  .taste-why blockquote { border-left: 2px solid #4e3e2e; color: #978c82; }
+  .wish-bar { border-bottom: 1px solid #382b1c; background: #2b2010; }
+  .wish-position { color: #b57d58; }
+  button.taste-row:focus-visible { outline: 2px solid #cca284; }
+  .wish-arrows button { background: #35281a; color: #cca284; }
+  .wish-stock { color: #998d84; }
+  .wish-stock input { accent-color: #c59977; }
+  .wish-stock span { color: #887e75; }
+  .add-chip { background: #c99b7d; color: #2a1a03; }
+  .add-chip .roaster { color: #2a1a03cc; }
+  .wish-adding .wish-drop-hint { color: #a38472; }
+  nav button.active { background: none; }
+}

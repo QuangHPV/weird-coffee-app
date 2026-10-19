@@ -18,7 +18,9 @@ server and is not included in the GitHub Pages build.
 Browse filters open from the icon beside the bean count. Changes in the filter
 panel affect the list only after Apply; Cancel restores the previous selection.
 
-The fourth tab is the shared Backlog: a TODO list and a Completed list (two sub-tabs), each grouped by day, newest first. It reads `public.backlog_state` and saves through the authenticated `save_backlog` function with a revision check. The Mac manager uses the same document (`{"tasks": [{id, text, created, done_at}]}`). Apply `migrations/001_backlog.sql` to a new Neon branch before running this version there, followed by the remaining numbered migrations (`004_two_lists.sql` is the current shape). The only controls on a task are a tickbox and a trashcan (tap twice to delete); the first line of a message is its title and `#tags` are highlighted.
+The fourth tab is the shared Backlog: a TODO list and a Completed list (two sub-tabs), each grouped by day, newest first. It reads `public.backlog_state` and saves through the authenticated `save_backlog` function with a revision check. The Mac manager uses the same document (`{"tasks": [{id, text, created, done_at}]}`). Apply `migrations/001_backlog.sql` to a new Neon branch before running this version there, followed by the remaining numbered migrations (`004_two_lists.sql` is the current shape). The controls on a task are a tickbox, a trashcan (opens a Delete / Cancel confirmation), and double-tap on an open TODO to edit it; the first line of a message is its title and `#tags` are highlighted.
+
+The backlog quietly checks for changes made on another device (every 15 s while open) and redraws only when the saved copy is newer; it leaves the screen alone while you edit or confirm a delete.
 
 Run `npm test` for the task helpers. The Mac client loads the same `src/backlog-ui.js`, `src/backlog-model.js`, and `src/backlog-ui.css` through its local server.
 
@@ -26,3 +28,9 @@ Bean cards show clean–funky and light–dark as a solid dot inside shaded rang
 
 The Wish list reuses the Browse card under a rank bar (position, move arrows). Press and hold a card to drag it. Tap targets have no tap-highlight flash.
 Sold-out Wish list cards are greyed. The "In stock only" toggle hides them without changing the saved order.
+
+Dark mode follows the phone's appearance. The block at the end of `src/style.css` repeats the light rules with flipped colors, so change both together.
+
+On Browse, press and hold a bean that is not saved: it shrinks to a chip, the Wish list opens, and the bean is added where you let go.
+
+Live updates (`src/live-update.js`, `checkForNewVersion` in `src/main.js`): while the app is open it checks for newer data every minute and redraws only when it changed. It also checks the published page for a new deployment (when the app returns to the foreground, when it comes back online, and every 5 minutes). A CSS-only change is swapped in place; a script change shows a "New version ready" toast and reloads once you are not typing, returning to the same tab and scroll position.

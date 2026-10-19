@@ -1,6 +1,7 @@
 import { createClient } from '@neondatabase/neon-js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
+import { reloadWhenIdle, saveSpot, takeSpot } from './live-update.js';
 
 const $ = id => document.getElementById(id);
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
@@ -135,7 +136,9 @@ function showSignedIn() {
   $('signout').hidden = demoMode;
 }
 
-async function loadData() {
+// `quiet` is the background check: it redraws only when the published data or the Wish list changed.
+let loadedSignature = '';
+async function loadData({ quiet = false } = {}) {
   if (demoMode) {
     snapshot = demoSnapshot;
     ranking ||= { ids: ['demo/02', 'demo/03', 'demo/01'], revision: 1 };
@@ -143,7 +146,7 @@ async function loadData() {
     buildFilters();
     render();
     notice('');
-    if (view === 'backlog') backlog.reload();
+    if (view === 'backlog') backlog.refresh();
     return;
   }
   if (!client || !navigator.onLine) {
@@ -161,6 +164,9 @@ async function loadData() {
       notice('No coffee data is available for this account. If this is your account, setup may not be complete yet.');
       return;
     }
+    const signature = `${snapResult.data[0].published_at}|${wishResult.data[0].revision}`;
+    if (quiet && signature === loadedSignature) { if (view === 'backlog') backlog.refresh(); return; }
+    loadedSignature = signature;
     snapshot = snapResult.data[0].payload;
     ranking = wishResult.data[0];
     if (!Array.isArray(snapshot.beans) || !Array.isArray(snapshot.runs) || !Array.isArray(ranking.ids)) throw new Error('Invalid data');
@@ -168,9 +174,9 @@ async function loadData() {
     buildFilters();
     render();
     notice('');
-    if (view === 'backlog') backlog.reload();
+    if (view === 'backlog') backlog.refresh();
   } catch {
-    notice('Could not load the latest data. Reconnect and reopen the app to try again.');
+    if (!quiet) notice('Could not load the latest data. Reconnect and reopen the app to try again.');
   }
 }
 
@@ -422,6 +428,7 @@ function tasteMeter(left, right, size, point, range, why, title, names) {
 
 function beanCard(bean) {
   const card = node('article', 'bean-card');
+  card.dataset.beanId = bean.id;
   const top = node('div', 'bean-top');
   const titleBox = node('div');
   titleBox.append(node('div', 'roaster', bean.roaster), node('div', 'bean-title', bean.title));
@@ -572,6 +579,34 @@ function startWishDrag(item, x, y, kind, identifier = null) {
   }, 320) };
 }
 
+// Press and hold a Browse card that is not saved yet: the card shrinks to a chip, the Wish list
+// opens, and the bean is added where the chip is released.
+function startAddDrag(card, x, y, kind, identifier = null) {
+  const bean = snapshot?.beans.find(value => value.id === card.dataset.beanId);
+  if (!bean || ranking?.ids.includes(bean.id) || pendingWishDrag || activeWishDrag || saving || !navigator.onLine) return;
+  pendingWishDrag = { item: card, x, y, kind, identifier, timer: setTimeout(() => {
+    if (!pendingWishDrag || pendingWishDrag.item !== card) return;
+    pendingWishDrag = null;
+    setView('wishlist');
+    const chip = node('div', 'add-chip');
+    chip.append(node('span', 'roaster', bean.roaster), node('b', '', bean.title));
+    chip.style.top = `${y - 26}px`;
+    document.body.append(chip);
+    const slot = node('li', 'wish-item wish-placeholder wish-adding');
+    slot.dataset.id = bean.id;
+    const bar = node('div', 'wish-bar');
+    bar.append(node('span', 'wish-position', ranking.ids.length + 1));
+    slot.append(bar, node('div', 'wish-drop-hint', 'Drop here'));
+    wishList.querySelector('.wish-empty')?.remove();
+    wishList.append(slot);
+    document.body.classList.add('wish-reordering');
+    activeWishDrag = { item: slot, ghost: chip, offsetY: 26, y, kind, identifier, adding: bean };
+    reorderWishAt(y);
+    activeWishDrag.frame = requestAnimationFrame(autoScrollWishList);
+    navigator.vibrate?.(12);
+  }, 320) };
+}
+
 function reorderWishAt(y) {
   const drag = activeWishDrag;
   if (!drag) return;
@@ -608,11 +643,33 @@ function finishWishDrag(save) {
   drag.ghost.remove();
   drag.item.classList.remove('wish-placeholder');
   document.body.classList.remove('wish-reordering');
+  if (drag.adding) {
+    // A bean dragged in from Browse: insert it after the shown bean just above the drop spot.
+    const shown = [...wishList.querySelectorAll(':scope > .wish-item')].map(item => item.dataset.id);
+    const above = shown[shown.indexOf(drag.adding.id) - 1];
+    drag.item.remove();
+    const ids = ranking.ids.filter(id => id !== drag.adding.id);
+    ids.splice(above ? ids.indexOf(above) + 1 : 0, 0, drag.adding.id);
+    if (save) saveRanking(ids);
+    else renderWishlist();
+    return;
+  }
   const ids = mergeShownOrder([...wishList.querySelectorAll(':scope > .wish-item')].map(item => item.dataset.id));
   if (save && ids.some((id, index) => id !== ranking.ids[index])) saveRanking(ids);
   else renderWishlist();
 }
 
+$('bean-list').addEventListener('touchstart', event => {
+  const card = event.target.closest('.bean-card');
+  if (!card || event.target.closest('button,a') || event.touches.length !== 1) return;
+  const touch = event.changedTouches[0];
+  startAddDrag(card, touch.clientX, touch.clientY, 'touch', touch.identifier);
+}, { passive: true });
+$('bean-list').addEventListener('pointerdown', event => {
+  if (event.pointerType !== 'mouse' || event.button !== 0 || event.target.closest('button,a')) return;
+  const card = event.target.closest('.bean-card');
+  if (card) startAddDrag(card, event.clientX, event.clientY, 'mouse');
+});
 wishList.addEventListener('touchstart', event => {
   const item = event.target.closest('.wish-item');
   if (!item || event.target.closest('button,a') || event.touches.length !== 1) return;
@@ -806,7 +863,7 @@ async function restoreSession() {
   try {
     const { data, error } = await client.auth.getSession();
     if (error) throw error;
-    if (data?.session) { showSignedIn(); await loadData(); }
+    if (data?.session) { showSignedIn(); await loadData(); restoreSpot(); }
     else showSignedOut();
   } catch {
     $('auth').hidden = false;
@@ -820,14 +877,84 @@ async function restoreSession() {
     $('auth-retry').disabled = false;
   }
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) loadData(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) { loadData(); checkForNewVersion(); } });
 updateNetwork();
 if (import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+
+// Live updates: check for newer data every minute while the app is open and quiet.
+setInterval(() => {
+  const dragging = activeWishDrag || pendingWishDrag;
+  if (document.hidden || $('app').hidden || saving || dragging || document.body.classList.contains('filters-open')) return;
+  loadData({ quiet: true });
+}, 60000);
+
+// The backlog is checked more often while it is on screen.
+setInterval(() => { if (view === 'backlog' && !document.hidden && !$('app').hidden) backlog.refresh(); }, 15000);
+
+// New deployment: the published page points at different script or CSS files than the ones running.
+// A CSS-only change is swapped in place; a script change reloads once you are not typing.
+const SPOT = 'anotherCupSpot';
+let spot = takeSpot(SPOT);
+function restoreSpot() {
+  if (!spot) return;
+  if (spot.view && spot.view !== view) setView(spot.view);
+  window.scrollTo(0, spot.scroll || 0);
+  spot = null;
+}
+const filesOf = html => {
+  const page = new DOMParser().parseFromString(html, 'text/html');
+  return {
+    script: page.querySelector('script[type=module][src]')?.getAttribute('src') || '',
+    styles: [...page.querySelectorAll('link[rel=stylesheet]')].map(link => link.getAttribute('href')).filter(href => href.startsWith('./')),
+  };
+};
+let versionCheckedAt = 0;
+let knownScript = '', runningPrint = '';
+// The script file name changes with any CSS change too, so compare the scripts with the CSS names removed.
+// Old files disappear after a deployment, so the running script is fingerprinted once, at the first check.
+async function scriptPrint(url) {
+  const text = (await (await fetch(url)).text()).replace(/index-[\w-]{8}\.css/g, 'index.css');
+  const hash = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text));
+  return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+async function checkForNewVersion() {
+  if (!import.meta.env.PROD || !navigator.onLine || Date.now() - versionCheckedAt < 30000) return;
+  versionCheckedAt = Date.now();
+  try {
+    const response = await fetch(location.pathname, { cache: 'no-store' });
+    if (!response.ok) return;
+    const latest = filesOf(await response.text());
+    const running = filesOf(document.documentElement.outerHTML);
+    if (!knownScript) { knownScript = running.script; runningPrint = await scriptPrint(running.script); }
+    navigator.serviceWorker?.getRegistration().then(registration => registration?.update()).catch(() => {});
+    if (latest.script && latest.script !== knownScript) {
+      if (await scriptPrint(latest.script) !== runningPrint) {
+        reloadWhenIdle({ beforeReload: () => saveSpot(SPOT, { view }) });
+        return;
+      }
+      knownScript = latest.script;
+    }
+    for (const link of document.querySelectorAll('link[rel=stylesheet]')) {
+      const href = link.getAttribute('href');
+      if (!href.startsWith('./') || latest.styles.includes(href)) continue;
+      const next = latest.styles.find(value => value.replace(/-[\w-]{8}\.css$/, '') === href.replace(/-[\w-]{8}\.css$/, ''));
+      if (!next) continue;
+      const fresh = link.cloneNode();
+      fresh.href = next;
+      fresh.onload = () => link.remove();
+      link.after(fresh);
+    }
+  } catch { /* try again at the next check */ }
+}
+setInterval(() => { if (!document.hidden) checkForNewVersion(); }, 300000);
+window.addEventListener('online', checkForNewVersion);
+checkForNewVersion();
 if (demoMode) {
   showSignedIn();
   loadData();
   const previewView = new URLSearchParams(location.search).get('view');
   if (['browse', 'wishlist', 'activity', 'backlog'].includes(previewView)) setView(previewView);
+  restoreSpot();
 } else if (!client) {
   showSignedOut();
   $('auth-form').hidden = true;

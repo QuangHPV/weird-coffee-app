@@ -8,23 +8,37 @@ const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V
 const dayLabel = day => new Date(`${day}T00:00:00`).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
 const timeLabel = stamp => hasTime(stamp) ? new Date(stamp).toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit' }) : '';
 const toState = result => ({ ...result, document: normalizeDocument(result.document), revision: Number(result.revision) });
+const DOUBLE_CLICK_MS = 400;
 
 export function mountBacklog(root, adapter) {
-  let state = null, tab = 'todo', busy = false, loading = false, message = '', draft = '', armed = null, armTimer = null;
+  let state = null, tab = 'todo', busy = false, loading = false, message = '', draft = '';
+  let confirming = null;                 // id of the task whose delete confirmation is open
+  let editing = null, editDraft = '';    // id and text of the TODO being edited
+  let lastClick = { id: null, time: 0 };
   const disabled = () => busy || loading || state?.synced === false;
 
   function renderTask(task, field) {
     const { title, body } = splitMessage(task.text);
     const done = task.done_at != null;
     const time = timeLabel(task[field]);
+    const open = confirming === task.id;
+    const content = editing === task.id
+      ? `<form class="backlog-edit"><textarea name="edit" rows="2" maxlength="2000" aria-label="Edit task">${escapeText(editDraft)}</textarea>
+          <div class="backlog-edit-actions"><button type="submit" ${disabled() ? 'disabled' : ''}>Save</button>
+          <button type="button" data-action="cancel-edit">Cancel</button></div></form>`
+      : `<div class="backlog-title">${tagged(title)}</div>
+        ${body ? `<div class="backlog-body">${tagged(body)}</div>` : ''}${time ? `<div class="backlog-time">${time}</div>` : ''}`;
     return `<li class="backlog-task ${done ? 'is-done' : ''}" data-id="${escapeText(task.id)}">
       <input type="checkbox" data-action="toggle" ${done ? 'checked' : ''} ${disabled() ? 'disabled' : ''}
         aria-label="${done ? 'Move back to TODO' : 'Complete'}: ${escapeText(title)}">
-      <div class="backlog-text"><div class="backlog-title">${tagged(title)}</div>
-        ${body ? `<div class="backlog-body">${tagged(body)}</div>` : ''}${time ? `<div class="backlog-time">${time}</div>` : ''}</div>
-      <button type="button" class="backlog-trash ${armed === task.id ? 'armed' : ''}" data-action="delete" ${disabled() ? 'disabled' : ''}
-        aria-label="${armed === task.id ? 'Tap again to delete' : 'Delete'}: ${escapeText(title)}"
-        title="${armed === task.id ? 'Tap again to delete' : 'Delete'}">${TRASH}</button>
+      <div class="backlog-text ${done ? '' : 'can-edit'}">${content}</div>
+      <div class="backlog-trash-wrap">
+        <button type="button" class="backlog-trash ${open ? 'armed' : ''}" data-action="delete" ${disabled() ? 'disabled' : ''}
+          aria-haspopup="true" aria-expanded="${open}" aria-label="Delete: ${escapeText(title)}" title="Delete">${TRASH}</button>
+        ${open ? `<div class="backlog-confirm" role="alertdialog" aria-label="Delete this task?"><span>Delete this task?</span>
+          <button type="button" class="backlog-confirm-yes" data-action="confirm-delete">Delete</button>
+          <button type="button" data-action="cancel-delete">Cancel</button></div>` : ''}
+      </div>
     </li>`;
   }
 
@@ -39,7 +53,11 @@ export function mountBacklog(root, adapter) {
       ${groups || `<p class="backlog-empty">${empty}</p>`}</section>`;
   }
 
-  function render() {
+  // Redrawing replaces the DOM, so put the cursor back in the box the person was typing in.
+  function render(focusName = null) {
+    const active = document.activeElement;
+    const keep = focusName ? { name: focusName, start: Infinity, end: Infinity }
+      : root.contains(active) && active.name ? { name: active.name, start: active.selectionStart, end: active.selectionEnd } : null;
     if (!state) {
       root.innerHTML = `<div class="backlog-loading" role="status">${escapeText(message || 'Loading backlog…')}</div>${message ? '<button type="button" data-action="retry">Retry</button>' : ''}`;
       return;
@@ -52,11 +70,17 @@ export function mountBacklog(root, adapter) {
       <div class="backlog-message" role="status">${escapeText(message || (state.synced === false ? 'Offline copy. Reconnect to edit.' : ''))}</div>
       ${tab === 'todo' ? renderList('TODO', todo, 'created', 'Nothing to do.') : renderList('Completed', completed, 'done_at', 'Nothing completed yet.')}`;
     autosize();
+    if (keep) {
+      const box = root.querySelector(`textarea[name="${keep.name}"]`);
+      if (box && !box.disabled) {
+        box.focus();
+        box.setSelectionRange(Math.min(keep.start, box.value.length), Math.min(keep.end, box.value.length));
+      }
+    } else if (confirming) root.querySelector('.backlog-confirm-yes')?.focus();
   }
 
   function autosize() {
-    const box = root.querySelector('.backlog-add textarea');
-    if (box) { box.style.height = 'auto'; box.style.height = `${box.scrollHeight}px`; }
+    for (const box of root.querySelectorAll('textarea')) { box.style.height = 'auto'; box.style.height = `${box.scrollHeight}px`; }
   }
 
   async function reload() {
@@ -65,6 +89,19 @@ export function mountBacklog(root, adapter) {
     try { state = toState(await adapter.load()); message = ''; }
     catch (error) { message = error.message || 'Could not load the backlog.'; }
     finally { loading = false; render(); }
+  }
+
+  // Quiet check for changes made on another device. It leaves the screen alone while you are
+  // editing, confirming a delete or saving, and redraws only when the saved copy is newer.
+  async function refresh() {
+    if (!state) return reload();
+    if (loading || busy || editing || confirming) return;
+    try {
+      const next = toState(await adapter.load());
+      if (loading || busy || editing || confirming) return;
+      if (next.revision === state.revision && next.synced === state.synced) return;
+      state = next; message = ''; render();
+    } catch { /* keep what is on screen; the next check tries again */ }
   }
 
   // Apply a change and save it. If another device saved first, redo the change on its copy once.
@@ -90,8 +127,6 @@ export function mountBacklog(root, adapter) {
     } finally { busy = false; render(); }
   }
 
-  function disarm() { clearTimeout(armTimer); armed = null; }
-
   async function add() {
     const text = draft.trim();
     if (!text) return;
@@ -101,39 +136,85 @@ export function mountBacklog(root, adapter) {
     if (matchMedia('(pointer: fine)').matches) root.querySelector('.backlog-add textarea')?.focus();
   }
 
+  function startEdit(id) {
+    const task = state?.document.tasks.find(value => value.id === id);
+    if (!task || task.done_at != null || disabled()) return;
+    confirming = null; editing = id; editDraft = task.text;
+    render('edit');
+  }
+
+  function stopEdit() { editing = null; editDraft = ''; render(); }
+
+  async function saveEdit() {
+    const id = editing, text = editDraft.trim();
+    if (!id || !text) return;
+    const task = state.document.tasks.find(value => value.id === id);
+    if (task && task.text === text) return stopEdit();
+    const saved = await mutate(tasks => { const found = tasks.find(value => value.id === id); if (found) found.text = text; });
+    if (saved) stopEdit();
+  }
+
+  function closeConfirm() { confirming = null; render(); }
+
   root.addEventListener('click', event => {
     const tabButton = event.target.closest('[data-tab]');
-    if (tabButton) { disarm(); tab = tabButton.dataset.tab; render(); return; }
+    if (tabButton) { confirming = null; editing = null; tab = tabButton.dataset.tab; render(); return; }
     const button = event.target.closest('[data-action]');
-    if (armed && button?.dataset.action !== 'delete') { disarm(); render(); }
-    if (button?.dataset.action === 'retry') reload();
-    if (button?.dataset.action !== 'delete') return;
-    const id = button.closest('.backlog-task').dataset.id;
-    if (armed !== id) {
-      disarm(); armed = id; armTimer = setTimeout(() => { armed = null; render(); }, 3000); render();
-      return;
+    const action = button?.dataset.action;
+    if (confirming && !event.target.closest('.backlog-trash-wrap')) { confirming = null; render(); }
+    if (action === 'retry') reload();
+    else if (action === 'cancel-edit') stopEdit();
+    else if (action === 'cancel-delete') closeConfirm();
+    else if (action === 'delete') {
+      const id = button.closest('.backlog-task').dataset.id;
+      confirming = confirming === id ? null : id;
+      render();
+    } else if (action === 'confirm-delete') {
+      const id = button.closest('.backlog-task').dataset.id;
+      confirming = null;
+      mutate(tasks => { const index = tasks.findIndex(task => task.id === id); if (index >= 0) tasks.splice(index, 1); });
+    } else if (!action) {
+      // Two clicks (or taps) within 400 ms on an open TODO's text start editing.
+      const text = event.target.closest('.backlog-text.can-edit');
+      const id = text?.closest('.backlog-task').dataset.id;
+      if (!id || editing === id || event.target.closest('form')) return;
+      if (lastClick.id === id && event.timeStamp - lastClick.time < DOUBLE_CLICK_MS) {
+        lastClick = { id: null, time: 0 };
+        startEdit(id);
+      } else lastClick = { id, time: event.timeStamp };
     }
-    disarm();
-    mutate(tasks => { const index = tasks.findIndex(task => task.id === id); if (index >= 0) tasks.splice(index, 1); });
   });
+  // Clicks outside the backlog close an open delete confirmation.
+  // The path is read from the event, since the click already redrew the list and removed the button.
+  document.addEventListener('click', event => { if (confirming && !event.composedPath().includes(root)) closeConfirm(); });
   root.addEventListener('change', event => {
     if (event.target.dataset.action !== 'toggle') return;
     const id = event.target.closest('.backlog-task').dataset.id, done = event.target.checked;
     mutate(tasks => { const task = tasks.find(value => value.id === id); if (task) task.done_at = done ? new Date().toISOString() : null; });
   });
   root.addEventListener('input', event => {
-    if (event.target.name !== 'text') return;
-    draft = event.target.value;
+    if (event.target.name === 'text') draft = event.target.value;
+    else if (event.target.name === 'edit') editDraft = event.target.value;
+    else return;
     autosize();
   });
   root.addEventListener('keydown', event => {
-    // Enter adds on a desktop keyboard; Shift+Enter starts a new line.
-    if (event.target.name === 'text' && event.key === 'Enter' && !event.shiftKey && matchMedia('(pointer: fine)').matches) {
+    if (event.key === 'Escape') {
+      if (editing) { event.preventDefault(); stopEdit(); }
+      else if (confirming) { event.preventDefault(); closeConfirm(); }
+      return;
+    }
+    // Enter saves on a desktop keyboard; Shift+Enter starts a new line.
+    if ((event.target.name === 'text' || event.target.name === 'edit') && event.key === 'Enter'
+        && !event.shiftKey && matchMedia('(pointer: fine)').matches) {
       event.preventDefault();
-      add();
+      if (event.target.name === 'edit') saveEdit(); else add();
     }
   });
-  root.addEventListener('submit', event => { event.preventDefault(); add(); });
+  root.addEventListener('submit', event => {
+    event.preventDefault();
+    if (event.target.classList.contains('backlog-edit')) saveEdit(); else add();
+  });
 
-  return { reload };
+  return { reload, refresh };
 }

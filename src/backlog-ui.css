@@ -14,7 +14,7 @@
 .backlog-group{position:relative;margin:0 0 18px 5px;padding-left:18px;border-left:2px solid var(--line,#ddd0c4)}
 .backlog-day{position:relative;margin:0 0 9px;font-size:13px;font-weight:600;color:var(--muted,#786c63)}
 .backlog-day::before{content:"";position:absolute;left:-26px;top:3px;width:10px;height:10px;box-sizing:border-box;border-radius:50%;border:2px solid var(--accent,#8d543e);background:var(--bg,var(--panel,#fff))}
-.backlog-tasks{list-style:none;margin:0;padding:0;background:var(--panel,#fff);border:1px solid var(--line,#ddd0c4);border-radius:10px;overflow:hidden}
+.backlog-tasks{list-style:none;margin:0;padding:0;background:var(--panel,#fff);border:1px solid var(--line,#ddd0c4);border-radius:10px}
 .backlog-task{display:grid;grid-template-columns:20px minmax(0,1fr) 30px;gap:11px;align-items:start;padding:12px 8px 12px 14px}
 .backlog-task + .backlog-task{border-top:1px solid var(--line,#ddd0c4)}
 .backlog-task input[type=checkbox]{width:18px;height:18px;margin:1px 0 0;accent-color:var(--accent,#8d543e)}
@@ -27,4 +27,13 @@
 .backlog-trash svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .backlog-trash:hover:not(:disabled),.backlog-trash.armed{color:var(--no,#a43f3f);background:color-mix(in srgb,var(--no,#a43f3f) 10%,transparent)}
 .backlog-empty{margin:0;padding:26px;border:1px dashed var(--line,#ddd0c4);border-radius:10px;text-align:center;color:var(--muted,#786c63);font-size:13px}
-@media(max-width:700px){.backlog-add textarea{font-size:16px}}
+.backlog-text.can-edit{touch-action:manipulation}
+.backlog-edit textarea{display:block;width:100%;box-sizing:border-box;resize:none;overflow:hidden;max-height:260px;background:var(--bg,var(--panel,#fff));color:inherit;border:1px solid var(--accent,#8d543e);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;line-height:1.45}
+.backlog-edit-actions{display:flex;gap:8px;margin-top:8px}
+.backlog-edit-actions button{border:1px solid var(--line,#ddd0c4);border-radius:8px;padding:6px 13px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:650}
+.backlog-edit-actions button[type=submit]{border-color:transparent;background:var(--accent,#8d543e);color:var(--panel,#fff)}
+.backlog-trash-wrap{position:relative}
+.backlog-confirm{position:absolute;top:calc(100% + 6px);right:0;z-index:6;display:flex;align-items:center;gap:8px;white-space:nowrap;padding:9px 10px;background:var(--panel,#fff);border:1px solid var(--line,#ddd0c4);border-radius:10px;box-shadow:0 8px 24px #00000026;font-size:13px}
+.backlog-confirm button{border:1px solid var(--line,#ddd0c4);border-radius:7px;padding:5px 11px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:650}
+.backlog-confirm .backlog-confirm-yes{border-color:transparent;background:var(--no,#a43f3f);color:#fff}
+@media(max-width:700px){.backlog-add textarea,.backlog-edit textarea{font-size:16px}}
