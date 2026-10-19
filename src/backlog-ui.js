@@ -92,13 +92,15 @@ export function mountBacklog(root, adapter) {
   }
 
   // Quiet check for changes made on another device. It leaves the screen alone while you are
-  // editing, confirming a delete or saving, and redraws only when the saved copy is newer.
+  // editing, typing, confirming a delete or saving, and redraws only when the saved copy is newer.
   async function refresh() {
     if (!state) return reload();
-    if (loading || busy || editing || confirming) return;
+    // A redraw replaces the text box, and a script cannot bring the phone's keyboard back.
+    const writing = () => draft || editDraft || root.contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA';
+    if (loading || busy || editing || confirming || writing()) return;
     try {
       const next = toState(await adapter.load());
-      if (loading || busy || editing || confirming) return;
+      if (loading || busy || editing || confirming || writing()) return;
       if (next.revision === state.revision && next.synced === state.synced) return;
       state = next; message = ''; render();
     } catch { /* keep what is on screen; the next check tries again */ }

@@ -24,13 +24,13 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-CjcCRbdp.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DqYW6fXA.css">
+  <script type="module" crossorigin src="./assets/index-BZxmrspY.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CfsjyZ9Y.css">
 </head>
 <body>
   <header class="topbar">
     <h1>Find your next bag</h1>
-    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
+    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
   </header>
   <main>
     <section id="auth" class="auth-panel" hidden>
@@ -87,7 +87,7 @@
         <section class="filter-section filter-checks"><label><input id="filter-stock" type="checkbox" checked>In stock only</label><label><input id="filter-archived" type="checkbox">Archived beans</label></section>
         <section class="filter-section"><h3>Roast</h3>
           <div id="filter-roast" class="roast-range"><div class="roast-slider"><div class="roast-track" aria-hidden="true"><div id="filter-roast-fill" class="roast-fill"></div></div><input id="filter-roast-min" type="range" min="0" max="2" step="1" value="0" aria-label="Minimum roast level"><input id="filter-roast-max" type="range" min="0" max="2" step="1" value="2" aria-label="Maximum roast level"></div><div class="roast-levels" aria-hidden="true"><span>Light</span><span>Medium</span><span>Dark</span></div><div id="filter-roast-selection" class="roast-selection">All roast levels</div></div>
-          <label class="unknown-filter"><input id="filter-unknown" type="checkbox" checked>Include lots not stated<small>When roast or funk is not stated, the roast and vibe filters keep the lot and mark it "not stated" instead of guessing.</small></label>
+          <label class="unknown-filter" data-hint='Lots that do not state their roast or funk stay in when you filter by them, marked "not stated".'><input id="filter-unknown" type="checkbox" checked>Include possible fits</label>
         </section>
         <section class="filter-section"><h3>Process</h3><div id="filter-process" class="filter-chips"></div></section>
         <section class="filter-section"><h3>Origin</h3><div id="filter-origins" class="origin-groups"></div></section>

@@ -13,3 +13,18 @@ self.addEventListener('fetch', event => {
     return response;
   }).catch(() => caches.match(event.request)));
 });
+
+// A push from the Mac: show it, and open the app when it is tapped.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data.text() }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'Another Cup', {
+    body: data.body || '', icon: './icon-192.png', badge: './icon-192.png', data: { url: data.url || './' } }));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
+    for (const client of windows) if ('focus' in client) return client.focus();
+    return self.clients.openWindow(event.notification.data.url);
+  }));
+});

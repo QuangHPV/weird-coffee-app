@@ -2,6 +2,7 @@ import { createClient } from '@neondatabase/neon-js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
 import { reloadWhenIdle, saveSpot, takeSpot } from './live-update.js';
+import { pushSupported, pushEnabled, enablePush, disablePush } from './push.js';
 
 const $ = id => document.getElementById(id);
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
@@ -131,6 +132,7 @@ function showSignedOut() {
   $('app').hidden = true;
   $('navigation').hidden = true;
   $('signout').hidden = true;
+  $('notify').hidden = true;
   $('auth-form').hidden = false;
   $('auth-retry').hidden = true;
 }
@@ -140,6 +142,7 @@ function showSignedIn() {
   $('app').hidden = false;
   $('navigation').hidden = false;
   $('signout').hidden = demoMode;
+  showNotifyButton();
 }
 
 // `quiet` is the background check: it redraws only when the published data or the Wish list changed.
@@ -967,6 +970,25 @@ $('auth-form').onsubmit = async event => {
   } finally {
     $('auth-submit').disabled = false;
   }
+};
+// The bell: phone notifications on or off. Hidden where the browser cannot do push.
+async function showNotifyButton() {
+  const button = $('notify');
+  button.hidden = demoMode || !client || !pushSupported();
+  if (button.hidden) return;
+  button.classList.toggle('on', await pushEnabled().catch(() => false));
+}
+$('notify').onclick = async () => {
+  const button = $('notify');
+  button.disabled = true;
+  try {
+    if (button.classList.contains('on')) await disablePush(client);
+    else if (!await enablePush(client)) notice('Notifications are blocked. Allow them in the browser settings.');
+  } catch (error) {
+    notice(`Could not change notifications. (${error?.message || 'unknown error'})`);
+  }
+  button.disabled = false;
+  showNotifyButton();
 };
 $('signout').onclick = async () => {
   await client?.auth.signOut();

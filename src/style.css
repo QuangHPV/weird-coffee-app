@@ -110,9 +110,12 @@ body.filters-open { overflow: hidden; }
 .filter-footer button.primary { border-color: var(--filter-accent); background: var(--filter-accent); color: #fff; }
 
 /* Wish list actions and touch ordering. */
-.toptools #signout { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid #ddcfc0; border-radius: 10px; background: #fffdfa; color: #704627; text-decoration: none; }
-.toptools #signout svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.toptools #signout:focus-visible { outline: 2px solid #704627; outline-offset: 2px; }
+.toptools #signout, .toptools #notify { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid #ddcfc0; border-radius: 10px; background: #fffdfa; color: #704627; text-decoration: none; }
+.toptools #signout svg, .toptools #notify svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.toptools #notify .slash { display: none; }
+.toptools #notify:not(.on) .slash { display: inline; }
+.toptools #notify.on { background: #704627; color: #fffdfa; }
+.toptools #signout:focus-visible, .toptools #notify:focus-visible { outline: 2px solid #704627; outline-offset: 2px; }
 .wish-item { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .wish-actions { display: flex; align-items: center; gap: 7px; }
 .wish-arrows { display: grid; gap: 3px; }
@@ -186,7 +189,11 @@ img,a{-webkit-user-drag:none}
 /* Roast or funk not stated: a dashed pill instead of dots, so it is not read as a wide range */
 .unknown-pill { flex: 1; max-width: 8rem; text-align: center; margin: 0 8px; padding: 1px 8px; border: 1px dashed #8b6954; border-radius: 999px; font-size: .72rem; font-style: italic; color: #786c61; }
 .unknown-filter { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; margin-top: 12px; font-size: .88rem; }
-.unknown-filter small { grid-column: 2; color: #8a7f78; font-size: .72rem; line-height: 1.35; }
+.unknown-filter { position: relative; }
+@media (hover: hover) and (pointer: fine) {
+  .unknown-filter::after { content: attr(data-hint); position: absolute; left: 0; bottom: calc(100% + 6px); width: 250px; padding: 8px 10px; border-radius: 9px; background: #30251e; color: #fffdfa; font-size: .72rem; font-weight: 600; line-height: 1.35; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .18s ease, transform .18s ease; z-index: 5; }
+  .unknown-filter:hover::after { opacity: 1; transform: none; transition-delay: .25s; }
+}
 
 /* A suggested replacement: previous listing, the choice, then the new listing */
 .replace-box { display: grid; gap: 10px; margin: 0 0 16px; }
@@ -249,12 +256,13 @@ img,a{-webkit-user-drag:none}
   .filter-trigger { border: 1px solid #4b3d2d; background: #221b16; color: #cca284; }
   .filter-trigger.has-filters::after { background: #cca284; }
   .filter-backdrop { background: #21180fb0; }
-  .filter-dialog input[type=checkbox]::after { border: solid #2e1b04; }
+  .filter-dialog input[type=checkbox]::after { border-color: #2e1b04; }
   .vibe-cell.active { color: #2d1604; }
   .sort-option.selected { background: #352818; }
   .filter-footer button.primary { color: #141414; }
-  .toptools #signout { border: 1px solid #4b3d2d; background: #221b16; color: #cca284; }
-  .toptools #signout:focus-visible { outline: 2px solid #cca284; }
+  .toptools #signout, .toptools #notify { border: 1px solid #4b3d2d; background: #221b16; color: #cca284; }
+  .toptools #notify.on { background: #cca284; color: #211a15; }
+  .toptools #signout:focus-visible, .toptools #notify:focus-visible { outline: 2px solid #cca284; }
   .wish-actions .wish-remove { color: #b04b49; }
   .wish-actions .wish-remove:hover { background: #320f0d; color: #c35757; }
   .wish-actions .wish-remove:focus-visible, .wish-arrows button:focus-visible { outline: 2px solid #cca284; }
@@ -284,7 +292,7 @@ img,a{-webkit-user-drag:none}
   .wish-adding .wish-drop-hint { color: #a38472; }
   nav button.active { background: none; }
   .unknown-pill { border-color: #a38472; color: #a29589; }
-  .unknown-filter small { color: #928a85; }
+  .unknown-filter::after { background: #f1e8de; color: #211a15; }
   .replace-box > h3 { color: #cca284; }
   .replace-box .replace-pair { border-color: #cca284; background: #2a211b; }
   .replace-card { border-color: #3b3027; background: #221b16; }
