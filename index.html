@@ -14,8 +14,17 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="stylesheet" href="./src/style.css?direct">
+  <link rel="stylesheet" href="./src/startup.css?direct">
   <title>Another Cup</title>
   <script>
+    try {
+      const previewIntro = new URLSearchParams(location.search).get('intro') === '1';
+      if (previewIntro) document.documentElement.classList.add('intro-preview');
+      if (!previewIntro && (matchMedia('(prefers-reduced-motion: reduce)').matches ||
+          sessionStorage.getItem('anotherCupIntroSeen') === '1')) {
+        document.documentElement.classList.add('intro-seen');
+      }
+    } catch {}
     if (location.hostname === '127.0.0.1' && location.port === '5173' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         if (!registrations.length) return;
@@ -27,6 +36,25 @@
   </script>
 </head>
 <body>
+  <div id="startupIntro" class="startup-intro" role="dialog" aria-modal="true" aria-label="Another Cup opening animation">
+    <div class="intro-grain" aria-hidden="true"></div>
+    <div class="intro-content" aria-hidden="true">
+      <p class="intro-eyebrow">Two cups · one discovery</p>
+      <div class="intro-stage">
+        <div class="intro-orbit"></div><div class="intro-route"></div>
+        <div class="intro-cups">
+          <div class="intro-cup left"><span class="intro-cup-handle"></span><span class="intro-cup-body"></span><span class="intro-cup-rim"></span><span class="intro-cup-mark"></span></div>
+          <div class="intro-cup right"><span class="intro-cup-handle"></span><span class="intro-cup-body"></span><span class="intro-cup-rim"></span><span class="intro-cup-mark"></span></div>
+        </div>
+        <div class="intro-splash gold"><span class="intro-drop"></span><span class="intro-drop"></span><span class="intro-drop"></span></div>
+        <div class="intro-splash berry"><span class="intro-drop"></span><span class="intro-drop"></span><span class="intro-drop"></span></div>
+        <div class="intro-spark"></div>
+      </div>
+      <h2 class="intro-title">Another Cup</h2>
+      <p class="intro-subtitle">A little more to discover.</p>
+    </div>
+    <button id="introSkip" class="intro-skip" type="button">Skip intro</button>
+  </div>
   <header class="topbar">
     <h1>Find your next bag</h1>
     <div class="toptools"><span id="network" role="status">Connecting…</span><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>

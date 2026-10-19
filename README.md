@@ -3,6 +3,11 @@
 This repository contains only the installable mobile web app. The Mac coffee
 manager, its local database, labels, and publishing credential stay on the Mac.
 
+The short two-cup startup animation is shared with the Mac page through
+`src/startup.css` and `src/startup.js`. It plays once per browser tab session,
+can be skipped, and is omitted when reduced motion is preferred. Add `?intro=1`
+to either page URL to replay it during review.
+
 The site is published from `main` → `/docs` at
 https://quanghpv.github.io/weird-coffee-app/.
 

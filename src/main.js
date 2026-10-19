@@ -1,4 +1,5 @@
 import { createClient } from '@neondatabase/neon-js';
+import './startup.js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
 import { reloadWhenIdle, saveSpot, takeSpot } from './live-update.js';
