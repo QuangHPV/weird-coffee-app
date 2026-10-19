@@ -558,8 +558,8 @@ async function decideReplacement(item, accept) {
       decisions.push({ old_id: item.old_id, new_id: item.new_id });
     }
     notice('');
-  } catch {
-    notice('Could not save your choice. Nothing was changed.');
+  } catch (error) {
+    notice(`Could not save your choice. Nothing was changed.${error?.message ? ` (${error.message})` : ''}`);
   } finally {
     deciding = false;
     render();
