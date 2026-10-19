@@ -30,7 +30,16 @@ export function showToast(text, buttonLabel, onClick) {
   return { set: value => { label.textContent = value; }, close: () => toast.remove() };
 }
 
-export const typing = () => !!document.activeElement?.closest?.('input:not([type=checkbox]):not([type=range]), textarea, [contenteditable]');
+// "Typing" includes the moments the keyboard briefly takes focus away (for example the language menu),
+// and an unsent draft in a text area.
+const FIELD = 'input:not([type=checkbox]):not([type=range]), textarea, [contenteditable]';
+let lastTyped = 0;
+for (const type of ['focusin', 'input', 'keydown']) {
+  document.addEventListener(type, event => { if (event.target.closest?.(FIELD)) lastTyped = Date.now(); }, true);
+}
+export const typing = () => !!document.activeElement?.closest?.(FIELD)
+  || Date.now() - lastTyped < 20000
+  || [...document.querySelectorAll('textarea')].some(box => box.value.trim());
 
 // Tell the person a new version is ready, then reload after 2 s, unless they are busy.
 let waiting = false;

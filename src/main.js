@@ -14,6 +14,8 @@ const client = authUrl && dataApiUrl ? createClient({
 let snapshot = null;
 let ranking = null;
 let saving = false;
+let decisions = [];            // replacement choices made on a device, not yet applied by the Mac
+let deciding = false;
 let view = 'browse';
 let demoBacklog = { document: { tasks: [
   { id: 'sample-1', text: 'Refine the Browse cards #mobile\nCheck spacing on a phone.', created: '2026-10-18T09:30:00.000Z', done_at: null },
@@ -61,7 +63,7 @@ const SORT_OPTIONS = [
   { key: 'body', label: 'Bright → Rich' },
   { key: 'new', label: 'Newest' }
 ];
-const defaultFilters = () => ({ search: '', vibeQuadrant: null, max: 60, inStock: true, stockBeforeArchive: true, showArchived: false, roastMin: 0, roastMax: 2, roasters: {}, origins: {}, process: {}, sort: 'per100g' });
+const defaultFilters = () => ({ search: '', vibeQuadrant: null, max: 60, inStock: true, stockBeforeArchive: true, showArchived: false, roastMin: 0, roastMax: 2, includeUnknown: true, roasters: {}, origins: {}, process: {}, sort: 'per100g' });
 const cloneFilters = filters => ({ ...filters, roasters: { ...filters.roasters }, origins: { ...filters.origins }, process: { ...filters.process } });
 let appliedFilters = defaultFilters();
 let draftFilters = null;
@@ -71,7 +73,11 @@ const demoSnapshot = {
     { id: 'demo/01', roaster: 'Northline Coffee', title: 'Ethiopia Sidama', price: 24, grams: 250, per100g: 9.6, available: true, url: 'https://example.com', first_seen: '2026-09-26', label: { origins: ['Ethiopia'], process: ['Washed'], roast: 'light', funk: 1, body: 1, notes: ['Floral', 'Citrus'] } },
     { id: 'demo/02', roaster: 'Daybreak Roasters', title: 'Colombia Huila', price: 27, grams: 250, per100g: 10.8, available: true, url: 'https://example.com', first_seen: '2026-09-25', label: { origins: ['Colombia'], process: ['Natural'], roast: 'medium', roast_range: ['light', 'medium'], funk: 4, funk_range: [3, 5], body: 2, notes: ['Berries', 'Cocoa'],
       why: { funk: { reason: 'Natural process with berry notes; no fermentation details.', quotes: ['Natural'] }, roast: { reason: 'No roast stated.', quotes: [] } } } },
+    { id: 'demo/04', roaster: 'Northline Coffee', title: 'Brazil Cerrado Natural', price: 21, grams: 250, per100g: 8.4, available: true, url: 'https://example.com', first_seen: '2026-09-27', label: { origins: ['Brazil'], process: ['Natural'], roast: null, funk: null, funk_range: [1, 5], roast_range: ['light', 'dark'], body: 4, notes: [], why: { funk: { reason: 'No process or tasting notes on the page.', quotes: [] }, roast: { reason: 'No roast level, use or tasting notes are stated.', quotes: [] } } } },
     { id: 'demo/03', roaster: 'Northline Coffee', title: 'Brazil Cerrado', price: 21, grams: 250, per100g: 8.4, available: false, url: 'https://example.com', first_seen: '2026-09-20', label: { origins: ['Brazil'], process: ['Pulped natural'], roast: 'dark', funk: 1, body: 4, notes: ['Caramel', 'Nuts'] } }
+  ],
+  suggestions: [
+    { old_id: 'demo/03', new_id: 'demo/04', confidence: 0.96, reason: 'Same farm and lot number; the new page only adds a process line.', changes: ['process added'], evidence: [] }
   ],
   runs: [
     { finished_at: '2026-09-26T10:00:00Z', source: 'daily', status: 'Completed', labeled_count: 2, events: [{ event: 'new', roaster: 'Northline Coffee', title: 'Ethiopia Sidama' }] },
@@ -167,6 +173,8 @@ async function loadData({ quiet = false } = {}) {
     const signature = `${snapResult.data[0].published_at}|${wishResult.data[0].revision}`;
     if (quiet && signature === loadedSignature) { if (view === 'backlog') backlog.refresh(); return; }
     loadedSignature = signature;
+    const decided = await client.from('replacement_decisions').select('old_id,new_id');
+    decisions = decided.error ? [] : decided.data;   // the table may not exist yet
     snapshot = snapResult.data[0].payload;
     ranking = wishResult.data[0];
     if (!Array.isArray(snapshot.beans) || !Array.isArray(snapshot.runs) || !Array.isArray(ranking.ids)) throw new Error('Invalid data');
@@ -292,14 +300,26 @@ function vibeQuadrantFor(label) {
   return `${label.funk >= 3 ? 'funky' : 'clean'}-${label.body >= 3 ? 'rich' : 'bright'}`;
 }
 
+// A lot whose funk is not stated can still be placed on the bright or rich side. With "Include lots not stated"
+// on, it matches either clean or funky as long as its bright or rich side fits.
+function fitsQuadrant(label, filters) {
+  if (label && label.funk === null && Number.isInteger(label.body) && label.body >= 1 && label.body <= 5) {
+    return filters.includeUnknown && filters.vibeQuadrant.endsWith(label.body >= 3 ? '-rich' : '-bright');
+  }
+  return vibeQuadrantFor(label) === filters.vibeQuadrant;
+}
+
 function matches(bean, filters, skipField = null) {
   if (Boolean(bean.archived) !== filters.showArchived) return false;
   if (filters.inStock && (!bean.available || bean.gone)) return false;
   if (bean.per100g && filters.max < 60 && bean.per100g > filters.max) return false;
-  if (filters.vibeQuadrant && vibeQuadrantFor(bean.label) !== filters.vibeQuadrant) return false;
+  if (filters.vibeQuadrant && !fitsQuadrant(bean.label, filters)) return false;
   if (filters.roastMin > 0 || filters.roastMax < ROAST_LEVELS.length - 1) {
-    const roast = ROAST_LEVELS.indexOf((bean.label?.roast || '').toLowerCase());
-    if (roast < filters.roastMin || roast > filters.roastMax) return false;
+    if (bean.label?.roast === null) { if (!filters.includeUnknown) return false; }
+    else {
+      const roast = ROAST_LEVELS.indexOf((bean.label?.roast || '').toLowerCase());
+      if (roast < filters.roastMin || roast > filters.roastMax) return false;
+    }
   }
   const search = filters.search.trim().toLowerCase();
   if (search && ![bean.title, bean.roaster, ...values(bean, 'origins'), ...values(bean, 'process'), ...(bean.label?.notes || [])]
@@ -341,6 +361,7 @@ function renderFilterPanel() {
   $('filter-price').value = draftFilters.max;
   $('filter-price-label').textContent = draftFilters.max >= 60 ? 'any' : `≤ $${draftFilters.max}`;
   $('filter-price').setAttribute('aria-valuetext', draftFilters.max >= 60 ? 'Any price' : `Up to $${draftFilters.max} per 100 grams`);
+  $('filter-unknown').checked = draftFilters.includeUnknown;
   $('filter-stock').checked = draftFilters.inStock;
   $('filter-stock').disabled = draftFilters.showArchived;
   $('filter-archived').checked = draftFilters.showArchived;
@@ -404,6 +425,24 @@ function renderFilterPanel() {
 
 // Best guess (solid dot) inside its range (shaded dots). Tap the row to read the reason and page quotes.
 function tasteMeter(left, right, size, point, range, why, title, names) {
+  if (point === null) {
+    // No evidence on the page: no dots at all, so it is not mistaken for a wide range.
+    const wrap = node('div', 'taste-meter');
+    const row = node(why?.reason ? 'button' : 'div', 'taste-row');
+    const pill = node('span', 'unknown-pill', 'not stated');
+    pill.setAttribute('aria-label', `${title}: not stated`);
+    row.append(node('span', '', left), pill, node('span', '', right));
+    wrap.append(row);
+    if (!why?.reason) return wrap;
+    row.type = 'button';
+    row.setAttribute('aria-expanded', 'false');
+    const pop = node('div', 'taste-why');
+    pop.hidden = true;
+    pop.append(node('b', '', `${title}: not stated`), node('span', '', why.reason));
+    row.onclick = () => { pop.hidden = !pop.hidden; row.setAttribute('aria-expanded', String(!pop.hidden)); };
+    wrap.append(pop);
+    return wrap;
+  }
   const [lo, hi] = Array.isArray(range) ? range : [point, point];
   const name = n => names ? names[n - 1] : n;
   const span = lo === hi ? `${name(point)}` : `${name(point)}, range ${name(lo)} to ${name(hi)}`;
@@ -452,15 +491,88 @@ function beanCard(bean) {
   const link = safeLink(bean.url, 'View bean ↗');
   if (link) footer.append(link);
   const label = bean.label;
-  if (label && Number.isInteger(label.funk)) {
+  if (label && (Number.isInteger(label.funk) || label.funk === null)) {
     const roast = ROAST_LEVELS.indexOf((label.roast || '').toLowerCase()) + 1;
     const taste = node('div', 'taste');
     taste.append(tasteMeter('clean', 'funky', 5, label.funk, label.funk_range, label.why?.funk, 'Clean to funky'));
-    if (roast) taste.append(tasteMeter('light', 'dark', 3, roast, label.roast_range?.map(r => ROAST_LEVELS.indexOf(r) + 1),
+    if (label.roast === null) taste.append(tasteMeter('light', 'dark', 3, null, null, label.why?.roast, 'Roast', ROAST_LEVELS));
+    else if (roast) taste.append(tasteMeter('light', 'dark', 3, roast, label.roast_range?.map(r => ROAST_LEVELS.indexOf(r) + 1),
       label.why?.roast, 'Roast', ROAST_LEVELS));
     card.append(top, meta, taste, footer);
   } else card.append(top, meta, footer);
   return card;
+}
+
+// Pending "same lot, new listing" suggestions that nobody has decided yet.
+function pendingReplacements() {
+  const byId = new Map((snapshot?.beans || []).map(bean => [bean.id, bean]));
+  return (snapshot?.suggestions || []).filter(item => byId.has(item.old_id) && byId.has(item.new_id)
+    && !decisions.some(choice => choice.old_id === item.old_id && choice.new_id === item.new_id));
+}
+
+function replaceCard(bean, role) {
+  const card = node('div', `replace-card ${role}`);
+  const origin = bean.label?.origins?.length ? bean.label.origins.join(', ') : 'Origin not stated';
+  const title = safeLink(bean.url, bean.title) || node('span', '', bean.title);
+  card.append(node('span', 'replace-tag', `${role === 'old' ? 'Previous listing' : 'New listing'}${bean.gone ? ', gone' : ''}`),
+    title, node('span', 'meta', `${bean.roaster} · ${origin}`),
+    node('span', 'meta', `$${Number(bean.price).toFixed(2)} / ${bean.grams || '?'}g`),
+    node('span', 'meta', `First seen ${date(bean.first_seen)}`));
+  if (bean.label?.notes?.length) card.append(node('span', 'meta', bean.label.notes.join(', ')));
+  return card;
+}
+
+// The old listing on top, the new one below, and the choice in between.
+function replacePair(item) {
+  const byId = new Map(snapshot.beans.map(bean => [bean.id, bean]));
+  const pair = node('div', 'replace-pair');
+  const middle = node('div', 'replace-middle');
+  middle.append(node('b', '', `Same lot? ${Math.round(item.confidence * 100)}% sure`), node('span', '', item.reason));
+  if (item.changes?.length) middle.append(node('span', '', `Changed: ${item.changes.join(', ')}`));
+  const actions = node('div', 'replace-actions');
+  for (const [accept, text, hint] of [[true, 'Accept', 'Same lot: keep the Wish list place, archive choice and first-seen date'],
+                                       [false, 'Reject', 'Different lot: keep them as two lots']]) {
+    const button = node('button', accept ? 'accept' : '', text);
+    button.type = 'button'; button.title = hint;
+    button.disabled = deciding || !navigator.onLine;
+    button.onclick = () => decideReplacement(item, accept);
+    actions.append(button);
+  }
+  middle.append(actions);
+  pair.append(replaceCard(byId.get(item.old_id), 'old'), middle, replaceCard(byId.get(item.new_id), 'new'));
+  return pair;
+}
+
+async function decideReplacement(item, accept) {
+  if (deciding || !navigator.onLine) return;
+  deciding = true;
+  render();
+  try {
+    if (demoMode) {
+      decisions.push({ old_id: item.old_id, new_id: item.new_id });
+      if (accept) ranking = { ...ranking, ids: ranking.ids.map(id => id === item.old_id ? item.new_id : id).filter((id, at, all) => all.indexOf(id) === at) };
+    } else {
+      const result = await client.rpc('decide_replacement', { old_listing: item.old_id, new_listing: item.new_id, do_accept: accept });
+      if (result.error) throw result.error;
+      ranking = Array.isArray(result.data) ? result.data[0] : result.data;
+      decisions.push({ old_id: item.old_id, new_id: item.new_id });
+    }
+    notice('');
+  } catch {
+    notice('Could not save your choice. Nothing was changed.');
+  } finally {
+    deciding = false;
+    render();
+  }
+}
+
+// Pinned above the Browse list until each one is accepted or rejected.
+function renderReplacements() {
+  const box = $('replacements');
+  const pairs = !snapshot || appliedFilters.showArchived ? [] : pendingReplacements();
+  box.hidden = !pairs.length;
+  if (!pairs.length) { box.replaceChildren(); return; }
+  box.replaceChildren(node('h3', '', `Possible replacement${pairs.length === 1 ? '' : 's'}`), ...pairs.map(replacePair));
 }
 
 function renderBrowse() {
@@ -469,7 +581,8 @@ function renderBrowse() {
   filtered.sort((a, b) => {
     if (appliedFilters.sort === 'new') return (b.first_seen || '').localeCompare(a.first_seen || '');
     if (appliedFilters.sort === 'per100g') return (a.per100g || 999) - (b.per100g || 999);
-    return (a.label?.[appliedFilters.sort] || 0) - (b.label?.[appliedFilters.sort] || 0);
+    const score = bean => bean.label?.[appliedFilters.sort] ?? 99;   // lots with no score sort last
+    return score(a) - score(b);
   });
   $('count').textContent = `${filtered.length} ${filtered.length === 1 ? 'bean' : 'beans'}`;
   $('bean-list').replaceChildren(...filtered.map(beanCard));
@@ -509,7 +622,9 @@ function renderWishlist() {
     arrows.append(up, down);
     bar.append(arrows);
     item.append(bar);
-    if (bean) item.append(beanCard(bean));
+    const suggestion = bean && pendingReplacements().find(entry => entry.old_id === id);
+    if (suggestion) item.append(replacePair(suggestion));
+    else if (bean) item.append(beanCard(bean));
     else {
       // The listing is gone from the data; the heart on a normal card is not available.
       const missing = node('div', 'wish-missing');
@@ -773,7 +888,7 @@ function renderActivity() {
   if (!runs.length) $('activity-list').append(node('p', 'muted', 'No completed scans yet.'));
 }
 
-function render() { renderBrowse(); renderWishlist(); renderActivity(); }
+function render() { renderReplacements(); renderBrowse(); renderWishlist(); renderActivity(); }
 
 function setView(next) {
   view = next;
@@ -823,6 +938,7 @@ $('filter-dialog').onkeydown = event => {
 };
 $('filter-search').oninput = event => { draftFilters.search = event.target.value; renderFilterPanel(); };
 $('filter-price').oninput = event => { draftFilters.max = Number(event.target.value); renderFilterPanel(); };
+$('filter-unknown').onchange = event => { draftFilters.includeUnknown = event.target.checked; renderFilterPanel(); };
 $('filter-stock').onchange = event => { draftFilters.inStock = event.target.checked; draftFilters.stockBeforeArchive = event.target.checked; renderFilterPanel(); };
 $('filter-archived').onchange = event => {
   draftFilters.showArchived = event.target.checked;

@@ -8,9 +8,9 @@
   <meta name="theme-color" content="#17120f" media="(prefers-color-scheme: dark)">
   <meta name="description" content="Browse Singapore coffee beans and keep your Wish list in sync.">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="preconnect" href="https://api.fontshare.com">
-  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
-  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@1&display=swap">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400..800&display=swap">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <title>Another Cup</title>
@@ -24,8 +24,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-CanuaVQS.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BVEA2352.css">
+  <script type="module" crossorigin src="./assets/index-dmUyu_38.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DqYW6fXA.css">
 </head>
 <body>
   <header class="topbar">
@@ -53,6 +53,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4"/><circle cx="8" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
           </button>
         </div>
+        <div id="replacements" class="replace-box" hidden></div>
         <div id="bean-list" class="bean-list"></div>
       </section>
       <section id="wishlist" aria-labelledby="wishlist-heading" hidden>
@@ -86,6 +87,7 @@
         <section class="filter-section filter-checks"><label><input id="filter-stock" type="checkbox" checked>In stock only</label><label><input id="filter-archived" type="checkbox">Archived beans</label></section>
         <section class="filter-section"><h3>Roast</h3>
           <div id="filter-roast" class="roast-range"><div class="roast-slider"><div class="roast-track" aria-hidden="true"><div id="filter-roast-fill" class="roast-fill"></div></div><input id="filter-roast-min" type="range" min="0" max="2" step="1" value="0" aria-label="Minimum roast level"><input id="filter-roast-max" type="range" min="0" max="2" step="1" value="2" aria-label="Maximum roast level"></div><div class="roast-levels" aria-hidden="true"><span>Light</span><span>Medium</span><span>Dark</span></div><div id="filter-roast-selection" class="roast-selection">All roast levels</div></div>
+          <label class="unknown-filter"><input id="filter-unknown" type="checkbox" checked>Include lots not stated<small>When roast or funk is not stated, the roast and vibe filters keep the lot and mark it "not stated" instead of guessing.</small></label>
         </section>
         <section class="filter-section"><h3>Process</h3><div id="filter-process" class="filter-chips"></div></section>
         <section class="filter-section"><h3>Origin</h3><div id="filter-origins" class="origin-groups"></div></section>

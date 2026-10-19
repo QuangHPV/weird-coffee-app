@@ -34,3 +34,7 @@ Dark mode follows the phone's appearance. The block at the end of `src/style.css
 On Browse, press and hold a bean that is not saved: it shrinks to a chip, the Wish list opens, and the bean is added where you let go.
 
 Live updates (`src/live-update.js`, `checkForNewVersion` in `src/main.js`): while the app is open it checks for newer data every minute and redraws only when it changed. It also checks the published page for a new deployment (when the app returns to the foreground, when it comes back online, and every 5 minutes). A CSS-only change is swapped in place; a script change shows a "New version ready" toast and reloads once you are not typing, returning to the same tab and scroll position.
+
+Roast or funk that the page does not state shows a dashed "not stated" pill instead of dots. The filter sheet's "Include lots not stated" checkbox (on by default) keeps those lots when the roast slider or a vibe quadrant is active.
+
+Suggested replacements (`snapshot.suggestions`) are pinned above Browse and replace the old listing's row in the Wish list: previous listing, reason with Accept and Reject, new listing, stacked. A choice calls the `decide_replacement` function and is stored in `replacement_decisions`; the Mac applies it. Apply `migrations/005_replacements.sql` to Neon before using it. The font is Nunito (Google Fonts link in `index.html`).
