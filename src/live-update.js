@@ -1,7 +1,7 @@
 // Shared by the Mac page and the mobile app: a small toast, and a reload that waits until
 // the person is not typing, so a new version never eats what they were writing.
 const STYLE = `
-.live-toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 12px 10px 16px;border-radius:12px;background:#30251e;color:#fffdfa;font:600 13px/1.35 system-ui,sans-serif;box-shadow:0 8px 28px #0000004d}
+.live-toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);width:max-content;z-index:50;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 12px 10px 16px;border-radius:12px;background:#30251e;color:#fffdfa;font:600 13px/1.35 system-ui,sans-serif;box-shadow:0 8px 28px #0000004d}
 .live-toast button{flex:none;border:0;border-radius:8px;padding:6px 12px;background:#fffdfa;color:#30251e;font:inherit;cursor:pointer}
 @media(min-width:700px){.live-toast{bottom:24px}}
 @media(prefers-color-scheme:dark){.live-toast{background:#f1e8de;color:#211a15}.live-toast button{background:#211a15;color:#f1e8de}}`;
