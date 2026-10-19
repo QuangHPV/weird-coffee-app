@@ -15,14 +15,6 @@
   <link rel="apple-touch-icon" href="./icon-192.png">
   <title>Another Cup</title>
   <script>
-    try {
-      const previewIntro = new URLSearchParams(location.search).get('intro') === '1';
-      if (previewIntro) document.documentElement.classList.add('intro-preview');
-      if (!previewIntro && (matchMedia('(prefers-reduced-motion: reduce)').matches ||
-          sessionStorage.getItem('anotherCupIntroSeen') === '1')) {
-        document.documentElement.classList.add('intro-seen');
-      }
-    } catch {}
     if (location.hostname === '127.0.0.1' && location.port === '5173' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         if (!registrations.length) return;
@@ -32,8 +24,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-CkRdTlFV.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DOLhHwE9.css">
+  <script type="module" crossorigin src="./assets/index-DY4vR-sO.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C_-ghGWG.css">
 </head>
 <body>
   <div id="startupIntro" class="startup-intro" role="dialog" aria-modal="true" aria-label="Another Cup opening animation">

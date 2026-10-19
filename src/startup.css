@@ -15,7 +15,6 @@
   animation: intro-exit 3.15s both;
 }
 
-html.intro-seen .startup-intro { display: none; }
 .startup-intro[hidden] { display: none; }
 .startup-intro.intro-skipping { animation: none; opacity: 0; transition: opacity .18s ease; }
 
@@ -258,5 +257,3 @@ html.intro-seen .startup-intro { display: none; }
 :root[data-theme="dark"] .intro-orbit, :root[data-theme="dark"] .intro-orbit::before, :root[data-theme="dark"] .intro-orbit::after, :root[data-theme="dark"] .intro-route { border-color: #745844; }
 :root[data-theme="dark"] .intro-skip { background: #342820; border-color: #816552; }
 @media (max-width: 480px) { .intro-cup { --intro-start: 65px; --intro-warmup: 50px; } }
-@media (prefers-reduced-motion: reduce) { .startup-intro { display: none; } }
-html.intro-preview .startup-intro { display: grid; }
