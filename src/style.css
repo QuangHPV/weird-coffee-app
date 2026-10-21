@@ -212,6 +212,36 @@ img,a{-webkit-user-drag:none}
 .replace-actions button.accept { background: #794a2a; border-color: #794a2a; color: #fffdfa; }
 .wish-item .replace-pair { padding: 12px; }
 
+/* Account setup and community requests. */
+.toptools #roaster-settings { border: 1px solid #ddcfc0; border-radius: 9px; background: #fffdfa; color: #704627; min-height: 38px; padding: 0 9px; text-decoration: none; font-size: .72rem; font-weight: 800; }
+.account-setup { max-width: 560px; margin: 6px auto 30px; padding: 22px; border: 1px solid #e5d9cd; border-radius: 17px; background: #fffdfa; }
+.account-setup p { color: #756d67; font-size: .86rem; margin: 9px 0 20px; }
+.setup-roasters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-bottom: 18px; }
+.setup-roaster { display: flex; align-items: center; gap: 9px; min-height: 46px; padding: 9px; border: 1px solid #ddcfc0; border-radius: 10px; font-size: .83rem; }
+.setup-roaster input { width: 18px; height: 18px; flex: none; accent-color: #794a2a; }
+#roaster-form > button { min-height: 44px; padding: 8px 16px; margin: 0 7px 7px 0; border-radius: 10px; }
+#cancel-roasters { border: 1px solid #ddcfc0; background: transparent; color: #704627; }
+.archive-action { align-self: start; min-height: 42px; padding: 0 8px; border: 1px solid #ddcfc0; border-radius: 9px; background: transparent; color: #704627; font-size: .7rem; font-weight: 800; }
+.empty-state { width: 100%; padding: 25px 18px; border: 1px dashed #ddcfc0; border-radius: 14px; color: #756d67; text-align: center; list-style: none; }
+.empty-state h3 { color: #30251e; font-size: 1rem; }
+.empty-state p { margin: 7px 0 14px; font-size: .84rem; }
+.empty-state button, .request-card button { min-height: 40px; padding: 7px 13px; border: 1px solid #ddcfc0; border-radius: 9px; background: #fffdfa; color: #704627; font-weight: 800; }
+.backlog-switch { display: flex; gap: 8px; margin-bottom: 18px; }
+.backlog-switch button { flex: 1; min-height: 42px; border: 1px solid #ddcfc0; border-radius: 9px; background: #fffdfa; color: #704627; font-weight: 800; }
+.backlog-switch button.active { background: #794a2a; border-color: #794a2a; color: #fffdfa; }
+.request-form { display: grid; gap: 8px; margin-bottom: 18px; }
+.request-form label { font-size: .84rem; font-weight: 800; }
+.request-form textarea { width: 100%; min-height: 80px; padding: 12px; border: 1px solid #ddcfc0; border-radius: 10px; background: #fffdfa; color: #30251e; resize: vertical; font: inherit; }
+.request-form button { justify-self: start; padding: 0 16px; }
+.request-card { margin-bottom: 10px; padding: 16px; border: 1px solid #e5d9cd; border-radius: 14px; background: #fffdfa; }
+.request-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 9px; color: #756d67; font-size: .7rem; }
+.request-state { color: #81532e; font-weight: 800; }
+.request-state.completed { color: #2f7d4f; }
+.request-card h3 { margin: 0 0 6px; overflow-wrap: anywhere; }
+.request-card p { white-space: pre-wrap; color: #756d67; font-size: .83rem; }
+.request-card button { margin-top: 6px; }
+@media(max-width: 370px) { .setup-roasters { grid-template-columns: 1fr; } .toptools { gap: .25rem; } }
+
 /* Dark mode follows the phone's appearance. Each rule repeats a rule above with its colors flipped, so edit both together. */
 @media (prefers-color-scheme: dark) {
   :root { color-scheme: dark; }
@@ -301,4 +331,12 @@ img,a{-webkit-user-drag:none}
   .replace-tag { color: #a38472; }
   .replace-actions button { border-color: #3b3027; background: #221b16; color: #eadfd5; }
   .replace-actions button.accept { background: #cca284; border-color: #cca284; color: #1d1814; }
+  .toptools #roaster-settings, .account-setup, .empty-state button, .request-card button, .backlog-switch button, .request-form textarea, .request-card { border-color: #413426; background: #221b16; color: #d1c3ba; }
+  .account-setup p, .empty-state, .request-card p, .request-head { color: #928a85; }
+  .setup-roaster, #cancel-roasters, .archive-action, .empty-state { border-color: #413426; color: #d1c3ba; }
+  .setup-roaster input { accent-color: #c99b7d; }
+  .empty-state h3 { color: #d1c3ba; }
+  .backlog-switch button.active { background: #c99b7d; border-color: #c99b7d; color: #141414; }
+  .request-state { color: #c99b7d; }
+  .request-state.completed { color: #7ac498; }
 }

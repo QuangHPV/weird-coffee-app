@@ -49,7 +49,7 @@
   </div>
   <header class="topbar">
     <h1>Find your next bag</h1>
-    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
+    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="roaster-settings" type="button" hidden>Roasters</button><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
   </header>
   <main>
     <section id="auth" class="auth-panel" hidden>
@@ -65,6 +65,13 @@
     </section>
     <section id="app" hidden>
       <div id="notice" class="notice" role="status" hidden></div>
+      <section id="roaster-setup" class="account-setup" aria-labelledby="setup-heading" hidden>
+        <span class="eyebrow">Your coffee</span><h2 id="setup-heading">Choose your roasters</h2>
+        <p>Choose at least one. You can change this anytime.</p>
+        <form id="roaster-form"><div id="setup-roasters" class="setup-roasters"></div>
+          <button id="save-roasters" class="primary" type="submit">Save roasters</button>
+          <button id="cancel-roasters" type="button" hidden>Cancel</button></form>
+      </section>
       <section id="browse" aria-label="Browse coffee beans">
         <div class="browse-toolbar">
           <div><strong id="count"></strong><span id="published"></span></div>
@@ -83,10 +90,18 @@
       </section>
       <section id="activity" aria-labelledby="activity-heading" hidden>
         <div class="section-heading"><div><span class="eyebrow">Recent history</span><h2 id="activity-heading">Activity</h2></div></div>
-        <p class="muted">Completed scans from your Mac appear here after they sync.</p>
+        <p id="activity-intro" class="muted">Coffee changes from your roasters appear here.</p>
         <div id="activity-list"></div>
       </section>
-      <section id="backlog" aria-label="Backlog" hidden><div id="backlog-root" class="backlog-shell"></div></section>
+      <section id="backlog" aria-label="Requests and backlog" hidden>
+        <div id="backlog-switch" class="backlog-switch" hidden><button id="show-todos" type="button">Admin TODO</button><button id="show-requests" type="button">Feature requests</button></div>
+        <div id="backlog-root" class="backlog-shell"></div>
+        <div id="requests-root" hidden>
+          <div class="section-heading"><div><span class="eyebrow">Community ideas</span><h2>Feature requests</h2></div></div>
+          <form id="request-form" class="request-form"><label for="request-text">What should improve?</label><textarea id="request-text" maxlength="2000" rows="2" required></textarea><button class="primary" type="submit">Send request</button></form>
+          <p id="request-status" role="status" class="muted"></p><div id="request-list"></div>
+        </div>
+      </section>
     </section>
   </main>
   <div id="filter-overlay" class="filter-overlay" hidden>
