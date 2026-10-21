@@ -24,8 +24,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-XLwfpOVj.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-PEnDEv9b.css">
+  <script type="module" crossorigin src="./assets/index-fnlQI2ft.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BI8Thwkx.css">
 </head>
 <body>
   <div id="startupIntro" class="startup-intro" role="dialog" aria-modal="true" aria-label="Another Cup opening animation">
@@ -49,7 +49,7 @@
   </div>
   <header class="topbar">
     <h1>Find your next bag</h1>
-    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="roaster-settings" type="button" hidden>Roasters</button><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
+    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
   </header>
   <main>
     <section id="auth" class="auth-panel" hidden>
@@ -67,10 +67,9 @@
       <div id="notice" class="notice" role="status" hidden></div>
       <section id="roaster-setup" class="account-setup" aria-labelledby="setup-heading" hidden>
         <span class="eyebrow">Your coffee</span><h2 id="setup-heading">Choose your roasters</h2>
-        <p>Choose at least one. You can change this anytime.</p>
+        <p>Choose at least one. A quick guide will show you where to change this later.</p>
         <form id="roaster-form"><div id="setup-roasters" class="setup-roasters"></div>
-          <button id="save-roasters" class="primary" type="submit">Save roasters</button>
-          <button id="cancel-roasters" type="button" hidden>Cancel</button></form>
+          <button id="save-roasters" class="primary" type="submit">Continue</button></form>
       </section>
       <section id="browse" aria-label="Browse coffee beans">
         <div class="browse-toolbar">
@@ -94,7 +93,6 @@
         <div id="activity-list"></div>
       </section>
       <section id="backlog" aria-label="Requests and backlog" hidden>
-        <div id="backlog-switch" class="backlog-switch" hidden><button id="show-todos" type="button">Admin TODO</button><button id="show-requests" type="button">Feature requests</button></div>
         <div id="backlog-root" class="backlog-shell"></div>
         <div id="requests-root" hidden>
           <div class="section-heading"><div><span class="eyebrow">Community ideas</span><h2>Feature requests</h2></div></div>
@@ -107,7 +105,7 @@
   <div id="filter-overlay" class="filter-overlay" hidden>
     <div class="filter-backdrop"></div>
     <section id="filter-dialog" class="filter-dialog" role="dialog" aria-modal="true" aria-labelledby="filter-title" tabindex="-1">
-      <header class="filter-header"><h2 id="filter-title">Filters</h2><button id="filter-close" class="filter-close" type="button" aria-label="Cancel and close filters">×</button></header>
+      <header class="filter-header"><h2 id="filter-title">Filters</h2><div class="filter-header-actions"><button id="filter-reset" type="button">Reset filters</button><button id="filter-close" class="filter-close" type="button" aria-label="Cancel and close filters">×</button></div></header>
       <div class="filter-body">
         <section class="filter-section"><h3>Search</h3><input id="filter-search" type="search" placeholder="Bean, roaster, origin…" aria-label="Search beans"></section>
         <section class="filter-section"><h3>Vibe</h3>
@@ -125,12 +123,16 @@
         </section>
         <section class="filter-section"><h3>Process</h3><div id="filter-process" class="filter-chips"></div></section>
         <section class="filter-section"><h3>Origin</h3><div id="filter-origins" class="origin-groups"></div></section>
-        <section class="filter-section"><h3>Roaster</h3><div id="filter-roasters" class="filter-options"></div></section>
+        <section id="filter-roaster-section" class="filter-section"><h3>Your roasters</h3><p class="filter-help">Choose the roasters that appear in Browse, Activity, and new bean notifications.</p><div id="filter-roasters" class="filter-options"></div></section>
         <section class="filter-section"><h3>Sort</h3><div id="filter-sort" class="sort-options" role="radiogroup" aria-label="Sort beans"></div></section>
       </div>
       <footer class="filter-footer"><span id="filter-results" role="status"></span><div><button id="filter-cancel" type="button">Cancel</button><button id="filter-apply" class="primary" type="button">Apply</button></div></footer>
     </section>
   </div>
+  <aside id="feature-tour" class="feature-tour" role="region" aria-label="Account guide" aria-live="polite" hidden>
+    <span id="tour-count" class="eyebrow"></span><h3 id="tour-title"></h3><p id="tour-copy"></p>
+    <div><button id="tour-skip" type="button">Skip guide</button><button id="tour-next" class="primary" type="button"></button></div>
+  </aside>
   <nav id="navigation" aria-label="Main navigation" hidden>
     <button class="active" data-view="browse" type="button" aria-label="Browse" aria-current="page">
       <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">

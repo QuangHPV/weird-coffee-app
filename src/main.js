@@ -19,16 +19,17 @@ let ranking = null;
 let profile = null;
 let archiveIds = new Set();
 let showingSetup = false;
-let requestMode = 'requests';
+let tourStep = 0;
 let requests = [];
 let saving = false;
+let savingFilters = false;
 let decisions = [];            // replacement choices made on a device, not yet applied by the Mac
 let deciding = false;
 let view = 'browse';
 let demoBacklog = { document: { tasks: [
-  { id: 'sample-1', text: 'Refine the Browse cards #mobile\nCheck spacing on a phone.', created: '2026-10-18T09:30:00.000Z', done_at: null },
-  { id: 'sample-2', text: 'Add more roasters #catalog', created: '2026-10-17T02:10:00.000Z', done_at: null },
-  { id: 'sample-3', text: 'Review spacing on a phone #mobile', created: '2026-10-16T08:00:00.000Z', done_at: '2026-10-17T06:45:00.000Z' }
+  { id: 'sample-1', text: 'Refine the Browse cards #mobile\nCheck spacing on a phone.', created: '2026-10-18T09:30:00.000Z', done_at: null, author_name: 'Coffee Owner' },
+  { id: 'sample-2', text: 'Add more roasters #catalog', created: '2026-10-17T02:10:00.000Z', done_at: null, author_name: 'Coffee Owner' },
+  { id: 'sample-3', text: 'Review spacing on a phone #mobile', created: '2026-10-16T08:00:00.000Z', done_at: '2026-10-17T06:45:00.000Z', author_name: 'Coffee Owner' }
 ] }, revision: 1 };
 const backlog = mountBacklog($('backlog-root'), {
   async load() {
@@ -73,6 +74,27 @@ const SORT_OPTIONS = [
 ];
 const defaultFilters = () => ({ search: '', vibeQuadrant: null, max: 60, inStock: true, stockBeforeArchive: true, showArchived: false, roastMin: 0, roastMax: 2, includeUnknown: true, roasters: {}, origins: {}, process: {}, sort: 'per100g' });
 const cloneFilters = filters => ({ ...filters, roasters: { ...filters.roasters }, origins: { ...filters.origins }, process: { ...filters.process } });
+function savedFilters(raw, roasters) {
+  const filters = defaultFilters();
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  for (const key of ['search', 'vibeQuadrant', 'max', 'inStock', 'stockBeforeArchive', 'showArchived', 'roastMin', 'roastMax', 'includeUnknown', 'sort']) {
+    if (typeof source[key] === typeof filters[key] || source[key] === null && filters[key] === null) filters[key] = source[key];
+  }
+  if (typeof source.vibeQuadrant === 'string') filters.vibeQuadrant = source.vibeQuadrant;
+  if (!Number.isInteger(filters.max) || filters.max < 5 || filters.max > 60) filters.max = 60;
+  if (!Number.isInteger(filters.roastMin) || filters.roastMin < 0 || filters.roastMin > 2) filters.roastMin = 0;
+  if (!Number.isInteger(filters.roastMax) || filters.roastMax < filters.roastMin || filters.roastMax > 2) filters.roastMax = 2;
+  if (!SORT_OPTIONS.some(option => option.key === filters.sort)) filters.sort = 'per100g';
+  if (filters.vibeQuadrant && !VIBE_QUADRANTS.some(option => option.key === filters.vibeQuadrant)) filters.vibeQuadrant = null;
+  filters.search = filters.search.slice(0, 200);
+  for (const field of ['origins', 'process']) {
+    const entries = Object.entries(source[field] && typeof source[field] === 'object' ? source[field] : {}).slice(0, 100);
+    filters[field] = Object.fromEntries(entries.filter(([key, value]) => key.length <= 100 && (field === 'origins' ? value === true : ['yes', 'no'].includes(value))));
+  }
+  filters.roasters = Object.fromEntries((roasters || []).map(name => [name, true]));
+  return filters;
+}
+const portableFilters = filters => { const { roasters, ...rest } = filters; return rest; };
 let appliedFilters = defaultFilters();
 let draftFilters = null;
 let originGroups = [];
@@ -138,7 +160,8 @@ function showSignedOut() {
   profile = null;
   archiveIds = new Set();
   showingSetup = false;
-  requestMode = 'requests';
+  tourStep = 0;
+  renderTour();
   requests = [];
   loadedSignature = '';
   $('auth').hidden = false;
@@ -146,7 +169,6 @@ function showSignedOut() {
   $('navigation').hidden = true;
   $('signout').hidden = true;
   $('notify').hidden = true;
-  $('roaster-settings').hidden = true;
   $('auth-form').hidden = false;
   $('auth-retry').hidden = true;
 }
@@ -156,7 +178,6 @@ function showSignedIn() {
   $('app').hidden = false;
   $('navigation').hidden = false;
   $('signout').hidden = demoMode;
-  $('roaster-settings').hidden = false;
   showNotifyButton();
 }
 
@@ -166,8 +187,8 @@ async function loadData({ quiet = false } = {}) {
   if (demoMode) {
     snapshot = demoSnapshot;
     ranking ||= { ids: demoMember ? [] : ['demo/02', 'demo/03', 'demo/01'], revision: 1 };
-    profile ||= { role: demoMember ? 'member' : 'admin', roasters: demoMember ? [] : ['Northline Coffee', 'Daybreak Roasters'], setup_complete: !demoMember };
-    requestMode = demoMember ? 'requests' : 'todos';
+    profile ||= { role: demoMember ? 'member' : 'admin', display_name: demoMember ? 'Alex' : 'Coffee Owner', roasters: demoMember ? [] : ['Northline Coffee', 'Daybreak Roasters'], filter_state: {}, filter_revision: 1, setup_complete: !demoMember, tour_complete: !demoMember };
+    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
     if (!profile.setup_complete) showingSetup = true;
     $('published').textContent = 'Sample data';
     renderSetup();
@@ -186,13 +207,13 @@ async function loadData({ quiet = false } = {}) {
       const initialized = await client.rpc('bootstrap_account');
       if (initialized.error) throw initialized.error;
       profile = Array.isArray(initialized.data) ? initialized.data[0] : initialized.data;
-      requestMode = profile.role === 'admin' ? 'todos' : 'requests';
+      appliedFilters = savedFilters(profile.filter_state, profile.roasters);
     }
     const [snapResult, wishResult, archiveResult, profileResult] = await Promise.all([
       client.from('app_snapshot').select('payload,published_at').eq('id', 1),
       client.from('wishlist_state').select('ids,revision,updated_at'),
       client.from('personal_archives').select('bean_id'),
-      client.from('app_users').select('role,roasters,setup_complete')
+      client.from('app_users').select('role,display_name,roasters,setup_complete,filter_state,filter_revision,tour_complete')
     ]);
     if (snapResult.error) throw snapResult.error;
     if (wishResult.error) throw wishResult.error;
@@ -203,12 +224,9 @@ async function loadData({ quiet = false } = {}) {
       return;
     }
     profile = { ...profile, ...profileResult.data[0] };
-    const signature = `${snapResult.data[0].published_at}|${wishResult.data[0].revision}|${archiveResult.data.map(row => row.bean_id).sort().join(',')}|${profile.roasters.join(',')}`;
+    const signature = `${snapResult.data[0].published_at}|${wishResult.data[0].revision}|${archiveResult.data.map(row => row.bean_id).sort().join(',')}|${profile.filter_revision}|${profile.tour_complete}`;
     if (quiet && signature === loadedSignature) {
-      if (view === 'backlog') {
-        if (profile.role === 'admin' && requestMode === 'todos') backlog.refresh();
-        else refreshRequests();
-      }
+      if (view === 'backlog') { if (profile.role === 'admin') backlog.refresh(); else refreshRequests(); }
       return;
     }
     loadedSignature = signature;
@@ -217,6 +235,7 @@ async function loadData({ quiet = false } = {}) {
     snapshot = snapResult.data[0].payload;
     ranking = wishResult.data[0];
     archiveIds = new Set(archiveResult.data.map(row => row.bean_id));
+    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
     if (!Array.isArray(snapshot.beans) || !Array.isArray(snapshot.runs) || !Array.isArray(ranking.ids)) throw new Error('Invalid data');
     snapshot = { ...snapshot, beans: snapshot.beans.map(bean => ({ ...bean, archived: archiveIds.has(bean.id) })) };
     $('published').textContent = `Updated ${date(snapResult.data[0].published_at)}`;
@@ -225,6 +244,8 @@ async function loadData({ quiet = false } = {}) {
     buildFilters();
     render();
     notice('');
+    if (profile.role === 'member' && profile.setup_complete && !profile.tour_complete && !tourStep) startTour();
+    else renderTour();
     if (view === 'backlog') refreshBacklogView();
   } catch {
     if (!quiet) notice('Could not load the latest data. Reconnect and reopen the app to try again.');
@@ -242,35 +263,70 @@ function renderSetup() {
     return label;
   }));
   $('roaster-setup').hidden = !showingSetup;
-  $('cancel-roasters').hidden = !profile.setup_complete;
-  $('roaster-settings').hidden = showingSetup;
   $('navigation').hidden = showingSetup;
   for (const name of ['browse', 'wishlist', 'activity', 'backlog']) $(name).hidden = showingSetup || name !== view;
 }
 
-$('roaster-settings').onclick = () => { showingSetup = true; renderSetup(); window.scrollTo(0, 0); };
-$('cancel-roasters').onclick = () => { showingSetup = false; renderSetup(); };
 $('roaster-form').onsubmit = async event => {
   event.preventDefault();
   const chosen = [...$('setup-roasters').querySelectorAll('input:checked')].map(box => box.value);
   if (!chosen.length) { notice('Choose at least one roaster.'); return; }
   $('save-roasters').disabled = true;
   try {
-    if (demoMode) profile = { ...profile, roasters: chosen, setup_complete: true };
+    if (demoMode) profile = { ...profile, roasters: chosen, setup_complete: true, filter_revision: profile.filter_revision + 1 };
     else {
       const result = await client.rpc('save_roaster_subscriptions', { next_roasters: chosen });
       if (result.error) throw result.error;
       profile = Array.isArray(result.data) ? result.data[0] : result.data;
     }
+    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
     showingSetup = false;
     notice('');
     renderSetup(); buildFilters(); render();
+    if (profile.role === 'member' && !profile.tour_complete) startTour();
   } catch (error) { notice(error.message || 'Could not save roasters.'); }
   finally { $('save-roasters').disabled = false; }
 };
 
+function startTour() {
+  tourStep = 1;
+  setView('browse');
+  renderTour();
+}
+
+function renderTour() {
+  $('feature-tour').hidden = !tourStep;
+  $('navigation').inert = Boolean(tourStep);
+  $('feature-tour').classList.toggle('in-filters', tourStep === 2);
+  $('open-filters').classList.toggle('tour-focus', tourStep === 1);
+  $('filter-roaster-section').classList.toggle('tour-focus', tourStep === 2);
+  if (!tourStep) return;
+  $('tour-count').textContent = `Step ${tourStep} of 2`;
+  $('tour-title').textContent = tourStep === 1 ? 'Your coffee, your way' : 'Change roasters anytime';
+  $('tour-copy').textContent = tourStep === 1
+    ? 'The filter button is where you shape Browse. Your choices are saved to your account.'
+    : 'You can change this anytime in Filters. Browse, Activity, and new bean notifications follow your roaster choices.';
+  $('tour-next').textContent = tourStep === 1 ? 'Show filters' : 'Got it';
+}
+
+async function finishTour() {
+  if (!demoMode) {
+    const result = await client.rpc('complete_account_guide');
+    if (result.error) { notice('Could not save the guide progress. Reconnect and try again.'); return; }
+  }
+  profile.tour_complete = true;
+  tourStep = 0;
+  renderTour();
+  if (!$('filter-overlay').hidden) closeFilters();
+}
+
+$('tour-next').onclick = () => {
+  if (tourStep === 1) openFilters(); else finishTour();
+};
+$('tour-skip').onclick = finishTour;
+
 function buildFilters() {
-  const selectedBeans = snapshot.beans.filter(bean => profile?.roasters.includes(bean.roaster));
+  const selectedBeans = snapshot.beans;
   const vibe = $('filter-vibe');
   vibe.replaceChildren(...VIBE_QUADRANTS.map(({ key, label, hint }) => {
     const button = node('button', 'vibe-cell');
@@ -392,7 +448,7 @@ function fitsQuadrant(label, filters) {
 }
 
 function matches(bean, filters, skipField = null) {
-  if (profile && !profile.roasters.includes(bean.roaster)) return false;
+  if (skipField !== 'roasters' && !filters.roasters[bean.roaster]) return false;
   if (Boolean(bean.archived) !== filters.showArchived) return false;
   if (filters.inStock && (!bean.available || bean.gone)) return false;
   if (bean.per100g && filters.max < 60 && bean.per100g > filters.max) return false;
@@ -408,7 +464,7 @@ function matches(bean, filters, skipField = null) {
   if (search && ![bean.title, bean.roaster, ...values(bean, 'origins'), ...values(bean, 'process'), ...(bean.label?.notes || [])]
     .join(' ').toLowerCase().includes(search)) return false;
   for (const field of ['roasters', 'origins', 'process']) {
-    if (field === skipField) continue;
+    if (field === skipField || field === 'roasters') continue;
     const beanValues = values(bean, field);
     if (field !== 'process') {
       const selected = Object.keys(filters[field]);
@@ -694,8 +750,8 @@ function renderBrowse() {
     const empty = node('div', 'empty-state');
     empty.append(node('h3', '', appliedFilters.showArchived ? 'Nothing archived yet' : 'No beans here yet'),
       node('p', '', appliedFilters.showArchived ? 'Archive a bean to keep it out of Browse.' : 'Try another filter or choose more roasters.'));
-    const button = node('button', '', 'Choose roasters');
-    button.onclick = () => { showingSetup = true; renderSetup(); };
+    const button = node('button', '', 'Open filters');
+    button.onclick = openFilters;
     empty.append(button); $('bean-list').append(empty);
   }
   const customized = JSON.stringify(appliedFilters) !== JSON.stringify(defaultFilters());
@@ -1014,16 +1070,11 @@ function renderRequests() {
     const card = node('article', 'request-card');
     const head = node('div', 'request-head');
     head.append(node('span', `request-state ${item.status}`, item.status === 'completed' ? 'Completed' : 'Requested'),
+      node('span', 'request-author', `By ${item.author_name || 'Member'}`),
       node('time', '', date(item.completed_at || item.created_at)));
     const [title, ...body] = item.text.split('\n');
     card.append(head, node('h3', '', title));
     if (body.length) card.append(node('p', '', body.join('\n')));
-    if (profile?.role === 'admin') {
-      const button = node('button', '', item.status === 'completed' ? 'Reopen' : 'Mark complete');
-      button.type = 'button';
-      button.onclick = () => updateRequest(item, item.status !== 'completed');
-      card.append(button);
-    }
     return card;
   }));
   if (!requests.length) list.append(node('div', 'empty-state', 'No feature requests yet. Tell us what would make Another Cup better.'));
@@ -1031,18 +1082,11 @@ function renderRequests() {
 
 async function refreshRequests() {
   if (demoMode) { renderRequests(); return; }
-  const result = await client.from('feature_requests').select('id,text,status,created_at,completed_at').order('created_at', { ascending: false });
+  const result = await client.from('feature_requests').select('id,author_name,text,status,created_at,completed_at').order('created_at', { ascending: false });
   if (result.error) { $('request-status').textContent = 'Could not load requests. Pull to refresh or try again later.'; return; }
   requests = result.data || [];
   $('request-status').textContent = '';
   renderRequests();
-}
-
-async function updateRequest(item, isComplete) {
-  if (demoMode) { item.status = isComplete ? 'completed' : 'requested'; item.completed_at = isComplete ? new Date().toISOString() : null; renderRequests(); return; }
-  const result = await client.rpc('set_feature_request_completed', { request_id: item.id, is_complete: isComplete });
-  if (result.error) { $('request-status').textContent = result.error.message || 'Could not update request.'; return; }
-  await refreshRequests();
 }
 
 $('request-form').onsubmit = async event => {
@@ -1052,7 +1096,7 @@ $('request-form').onsubmit = async event => {
   const button = $('request-form').querySelector('button');
   button.disabled = true;
   try {
-    if (demoMode) requests.unshift({ id: crypto.randomUUID(), text, status: 'requested', created_at: new Date().toISOString(), completed_at: null });
+    if (demoMode) requests.unshift({ id: crypto.randomUUID(), author_name: profile.display_name, text, status: 'requested', created_at: new Date().toISOString(), completed_at: null });
     else {
       const result = await client.rpc('submit_feature_request', { request_text: text });
       if (result.error) throw result.error;
@@ -1065,17 +1109,11 @@ $('request-form').onsubmit = async event => {
 
 function refreshBacklogView() {
   const admin = profile?.role === 'admin';
-  $('backlog-switch').hidden = !admin;
-  $('backlog-root').hidden = !admin || requestMode !== 'todos';
-  $('requests-root').hidden = admin && requestMode !== 'requests';
-  $('show-todos').classList.toggle('active', requestMode === 'todos');
-  $('show-requests').classList.toggle('active', requestMode === 'requests');
-  if (admin && requestMode === 'todos') backlog.reload();
-  else refreshRequests();
+  $('backlog-root').hidden = !admin;
+  $('requests-root').hidden = admin;
+  document.querySelector('nav [data-view="backlog"]').setAttribute('aria-label', admin ? 'Admin TODOs' : 'Feature requests');
+  if (admin) backlog.reload(); else refreshRequests();
 }
-
-$('show-todos').onclick = () => { requestMode = 'todos'; refreshBacklogView(); };
-$('show-requests').onclick = () => { requestMode = 'requests'; refreshBacklogView(); };
 
 function setView(next) {
   view = next;
@@ -1091,28 +1129,60 @@ function setView(next) {
 }
 
 document.querySelectorAll('nav button').forEach(button => button.onclick = () => setView(button.dataset.view));
-$('open-filters').onclick = () => {
+function openFilters() {
   draftFilters = cloneFilters(appliedFilters);
+  const availableRoasters = new Set(snapshot.beans.map(bean => bean.roaster));
+  draftFilters.roasters = Object.fromEntries(Object.keys(draftFilters.roasters)
+    .filter(name => availableRoasters.has(name)).map(name => [name, true]));
   $('filter-overlay').hidden = false;
   document.body.classList.add('filters-open');
   document.querySelector('.filter-body').scrollTop = 0;
   renderFilterPanel();
   $('filter-close').focus();
-};
-function closeFilters(apply = false) {
-  if (apply) {
-    appliedFilters = cloneFilters(draftFilters);
-    renderBrowse();
-  }
+  if (tourStep === 1) { tourStep = 2; renderTour(); $('filter-roaster-section').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+$('open-filters').onclick = openFilters;
+function closeFilters() {
   draftFilters = null;
   $('filter-overlay').hidden = true;
   document.body.classList.remove('filters-open');
+  if (tourStep === 2) { tourStep = 1; renderTour(); }
   $('open-filters').focus();
 }
-$('filter-close').onclick = () => closeFilters();
-$('filter-cancel').onclick = () => closeFilters();
-$('filter-apply').onclick = () => closeFilters(true);
-document.querySelector('.filter-backdrop').onclick = () => closeFilters();
+async function applyFilters() {
+  if (!draftFilters || savingFilters) return;
+  const chosen = Object.keys(draftFilters.roasters).filter(name => draftFilters.roasters[name]);
+  if (!chosen.length) { $('filter-results').textContent = 'Choose at least one roaster.'; return; }
+  if (!demoMode && !navigator.onLine) { $('filter-results').textContent = 'Reconnect to save filters.'; return; }
+  savingFilters = true;
+  $('filter-apply').disabled = true;
+  try {
+    if (demoMode) profile = { ...profile, roasters: chosen, filter_state: portableFilters(draftFilters), filter_revision: profile.filter_revision + 1 };
+    else {
+      const result = await client.rpc('save_filter_preferences', {
+        expected_revision: profile.filter_revision, next_roasters: chosen, next_filters: portableFilters(draftFilters)
+      });
+      if (result.error) throw result.error;
+      profile = Array.isArray(result.data) ? result.data[0] : result.data;
+    }
+    appliedFilters = cloneFilters(draftFilters);
+    const finishGuide = tourStep === 2;
+    buildFilters(); render(); notice('');
+    if (finishGuide) await finishTour(); else closeFilters();
+  } catch (error) {
+    $('filter-results').textContent = error.code === '40001' ? 'Filters changed on another device. Close and reopen to reload.'
+      : error.message || 'Could not save filters.';
+  } finally { savingFilters = false; $('filter-apply').disabled = false; }
+}
+$('filter-close').onclick = closeFilters;
+$('filter-cancel').onclick = closeFilters;
+$('filter-apply').onclick = applyFilters;
+$('filter-reset').onclick = () => {
+  if (!draftFilters) return;
+  draftFilters = savedFilters({}, Object.keys(draftFilters.roasters));
+  renderFilterPanel();
+};
+document.querySelector('.filter-backdrop').onclick = closeFilters;
 $('filter-dialog').onkeydown = event => {
   if (event.key === 'Escape') { event.preventDefault(); closeFilters(); return; }
   if (event.key !== 'Tab') return;
@@ -1213,8 +1283,7 @@ setInterval(() => {
 // The backlog is checked more often while it is on screen.
 setInterval(() => {
   if (view !== 'backlog' || document.hidden || $('app').hidden) return;
-  if (profile?.role === 'admin' && requestMode === 'todos') backlog.refresh();
-  else refreshRequests();
+  if (profile?.role === 'admin') backlog.refresh(); else refreshRequests();
 }, 15000);
 
 // New deployment: the published page points at different script or CSS files than the ones running.
@@ -1223,6 +1292,7 @@ const SPOT = 'anotherCupSpot';
 let spot = takeSpot(SPOT);
 function restoreSpot() {
   if (!spot) return;
+  if (tourStep || showingSetup) { spot = null; return; }
   if (spot.view && spot.view !== view) setView(spot.view);
   window.scrollTo(0, spot.scroll || 0);
   spot = null;

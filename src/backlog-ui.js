@@ -27,18 +27,20 @@ export function mountBacklog(root, adapter) {
           <div class="backlog-edit-actions"><button type="submit" ${disabled() ? 'disabled' : ''}>Save</button>
           <button type="button" data-action="cancel-edit">Cancel</button></div></form>`
       : `<div class="backlog-title">${tagged(title)}</div>
-        ${body ? `<div class="backlog-body">${tagged(body)}</div>` : ''}${time ? `<div class="backlog-time">${time}</div>` : ''}`;
+        ${body ? `<div class="backlog-body">${tagged(body)}</div>` : ''}
+        ${task.author_name ? `<div class="backlog-author">By ${escapeText(task.author_name)}${task.request_id ? ' · Feature request' : ''}</div>` : ''}
+        ${time ? `<div class="backlog-time">${time}</div>` : ''}`;
     return `<li class="backlog-task ${done ? 'is-done' : ''}" data-id="${escapeText(task.id)}">
       <input type="checkbox" data-action="toggle" ${done ? 'checked' : ''} ${disabled() ? 'disabled' : ''}
         aria-label="${done ? 'Move back to TODO' : 'Complete'}: ${escapeText(title)}">
-      <div class="backlog-text ${done ? '' : 'can-edit'}">${content}</div>
-      <div class="backlog-trash-wrap">
+      <div class="backlog-text ${done || task.request_id ? '' : 'can-edit'}">${content}</div>
+      ${task.request_id ? '' : `<div class="backlog-trash-wrap">
         <button type="button" class="backlog-trash ${open ? 'armed' : ''}" data-action="delete" ${disabled() ? 'disabled' : ''}
           aria-haspopup="true" aria-expanded="${open}" aria-label="Delete: ${escapeText(title)}" title="Delete">${TRASH}</button>
         ${open ? `<div class="backlog-confirm" role="alertdialog" aria-label="Delete this task?"><span>Delete this task?</span>
           <button type="button" class="backlog-confirm-yes" data-action="confirm-delete">Delete</button>
           <button type="button" data-action="cancel-delete">Cancel</button></div>` : ''}
-      </div>
+      </div>`}
     </li>`;
   }
 
@@ -140,7 +142,7 @@ export function mountBacklog(root, adapter) {
 
   function startEdit(id) {
     const task = state?.document.tasks.find(value => value.id === id);
-    if (!task || task.done_at != null || disabled()) return;
+    if (!task || task.done_at != null || task.request_id || disabled()) return;
     confirming = null; editing = id; editDraft = task.text;
     render('edit');
   }
