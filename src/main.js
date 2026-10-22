@@ -1,6 +1,5 @@
-import { createClient } from '@neondatabase/neon-js';
-import { BetterAuthVanillaAdapter } from '@neondatabase/neon-js/auth/vanilla/adapters';
-import { createDataLoader, LoadError, SessionEnded, readResult } from './data-loader.js';
+import { createAccountClient } from './account-client.js';
+import { createDataLoader, LoadError, readResult } from './data-loader.js';
 import './startup.js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
@@ -12,10 +11,8 @@ const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has
 const demoMember = demoMode && new URLSearchParams(location.search).get('demo') === 'member';
 const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
 const dataApiUrl = import.meta.env.VITE_NEON_DATA_API_URL;
-const client = authUrl && dataApiUrl ? createClient({
-  auth: { url: authUrl, adapter: BetterAuthVanillaAdapter({ fetchOptions: { timeout: 12000 } }) },
-  dataApi: { url: dataApiUrl }
-}) : null;
+const client = authUrl && dataApiUrl ? createAccountClient(authUrl, dataApiUrl) : null;
+let accountLoadStatus = 'idle';
 let snapshot = null;
 let ranking = null;
 let profile = null;
@@ -160,6 +157,8 @@ window.addEventListener('offline', updateNetwork);
 function showSignedOut({ cancelLoad = true } = {}) {
   if (cancelLoad) cancelAccountLoad();
   pushPrompt.reset();
+  client?.clear();
+  accountLoadStatus = 'signed-out';
   snapshot = null;
   ranking = null;
   profile = null;
@@ -168,6 +167,7 @@ function showSignedOut({ cancelLoad = true } = {}) {
   tourStep = 0;
   renderTour();
   requests = [];
+  decisions = [];
   loadedSignature = '';
   $('auth').hidden = false;
   $('app').hidden = true;
@@ -184,13 +184,11 @@ function showSignedIn() {
 }
 
 async function accountSession() {
-  const result = await client.auth.getSession({ fetchOptions: { headers: { 'X-Force-Fetch': 'true' }, timeout: 12000 } });
-  const data = readResult('session', result);
-  if (!data?.session || !data.user?.id) throw new SessionEnded();
-  return data.user.id;
+  return client.accountSession();
 }
 
 function setLoadState({ status, quiet = false, expired = false }) {
+  accountLoadStatus = status;
   const box = $('data-status');
   const loading = status === 'loading' || status === 'retrying';
   box.hidden = status === 'ready' || status === 'signed-out' || loading && !!snapshot;
@@ -217,16 +215,19 @@ const accountLoader = createDataLoader({
     if (signal.aborted) throw signal.reason;
     if (profile && profile.user_id !== userId) {
       showSignedOut({ cancelLoad: false });
+      // Re-establish the new session after clearing the old account's state.
+      await accountSession();
       $('auth').hidden = true;
       setLoadState({ status: 'loading' });
     }
-    const initial = profile?.user_id === userId ? profile : readResult('account setup', await client.rpc('bootstrap_account').abortSignal(signal));
+    const api = await client.forAccount(userId);
+    const initial = profile?.user_id === userId ? profile : readResult('account setup', await api.rpc('bootstrap_account').abortSignal(signal));
     const initialized = Array.isArray(initial) ? initial[0] : initial;
     const specs = [
-      ['catalog', client.from('app_snapshot').select('payload,published_at').eq('id', 1)],
-      ['wish list', client.from('wishlist_state').select('ids,revision,updated_at')],
-      ['archives', client.from('personal_archives').select('bean_id')],
-      ['profile', client.from('app_users').select('user_id,role,display_name,roasters,setup_complete,filter_state,filter_revision,tour_complete')]
+      ['catalog', api.from('app_snapshot').select('payload,published_at').eq('id', 1)],
+      ['wish list', api.from('wishlist_state').select('ids,revision,updated_at')],
+      ['archives', api.from('personal_archives').select('bean_id')],
+      ['profile', api.from('app_users').select('user_id,role,display_name,roasters,setup_complete,filter_state,filter_revision,tour_complete')]
     ];
     const [catalog, wish, archives, profiles] = await Promise.all(specs.map(async ([name, query]) =>
       readResult(name, await query.abortSignal(signal))));
@@ -238,7 +239,7 @@ const accountLoader = createDataLoader({
     if (!Array.isArray(payload?.beans) || !Array.isArray(payload?.runs) || !Array.isArray(wish[0].ids)) {
       throw new LoadError('data format', { code: 'INVALID_DATA' });
     }
-    const choices = await client.from('replacement_decisions').select('old_id,new_id').abortSignal(signal);
+    const choices = await api.from('replacement_decisions').select('old_id,new_id').abortSignal(signal);
     return { catalog: catalog[0], wish: wish[0], archives, profile: { ...initialized, ...profiles[0] },
       decisions: choices.error ? decisions : choices.data };
   },
@@ -263,7 +264,7 @@ const accountLoader = createDataLoader({
     restoreSpot();
     pushPrompt.update(profile);
   },
-  refreshSession: accountSession,
+  refreshSession: () => client.refreshSession(),
   state: setLoadState
 });
 function cancelAccountLoad() {
@@ -1300,14 +1301,17 @@ $('signout').onclick = async () => {
 async function restoreSession() {
   return loadData();
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) { loadData(); checkForNewVersion(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && accountLoadStatus !== 'signed-out') { loadData(); checkForNewVersion(); } });
 updateNetwork();
-if (import.meta.env.PROD && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  const build = new URL(import.meta.url).pathname.split('/').at(-1);
+  navigator.serviceWorker.register(`./sw.js?build=${encodeURIComponent(build)}`).catch(() => {});
+}
 
 // Live updates: check for newer data every minute while the app is open and quiet.
 setInterval(() => {
   const dragging = activeWishDrag || pendingWishDrag;
-  if (document.hidden || $('app').hidden || saving || dragging || showingSetup || document.body.classList.contains('filters-open')) return;
+  if (document.hidden || accountLoadStatus === 'signed-out' || saving || dragging || showingSetup || document.body.classList.contains('filters-open')) return;
   loadData({ quiet: true });
 }, 60000);
 
@@ -1340,7 +1344,9 @@ let knownScript = '', runningPrint = '';
 // The script file name changes with any CSS change too, so compare the scripts with the CSS names removed.
 // Old files disappear after a deployment, so the running script is fingerprinted once, at the first check.
 async function scriptPrint(url) {
-  const text = (await (await fetch(url)).text()).replace(/index-[\w-]{8}\.css/g, 'index.css');
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Version asset unavailable');
+  const text = (await response.text()).replace(/index-[\w-]{8}\.css/g, 'index.css');
   const hash = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text));
   return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }

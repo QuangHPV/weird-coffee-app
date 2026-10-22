@@ -77,9 +77,11 @@ test('bundled heading and body fonts load without external requests or narrow-sc
 test('the real service worker keeps both fonts available offline', async ({ page, context }) => {
   const app = await appFixture(page);
   await app.open(); await app.ready();
+  await page.evaluate(async () => { await caches.open('unrelated-app-cache'); });
   await page.evaluate(async () => { await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
-  const paths = ['/fonts/manrope.css', '/fonts/bricolage.css', '/fonts/manrope-latin.woff2', '/fonts/bricolage-latin.woff2'];
+  expect(await page.evaluate(() => caches.has('unrelated-app-cache'))).toBe(true);
+  const paths = ['/src/main.js', '/src/startup.css?direct', '/fonts/manrope.css', '/fonts/bricolage.css', '/fonts/manrope-latin.woff2', '/fonts/bricolage-latin.woff2'];
   for (const path of paths) expect(await page.evaluate(async path => Boolean(await caches.match(path)), path)).toBe(true);
   await context.setOffline(true);
   for (const path of paths) expect(await page.evaluate(async path => (await fetch(path)).ok, path)).toBe(true);

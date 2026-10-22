@@ -8,6 +8,44 @@ test('cold start retries the observed authorization failure without reloading', 
   await app.open(); await app.ready();
   expect(app.calls.bootstrap_account).toBe(2);
   expect(app.calls['get-session']).toBeGreaterThanOrEqual(2);
+  expect(app.calls.token).toBe(1);
+});
+
+test('a startup outage recovers automatically on the next background check', async ({ page }) => {
+  const app = await appFixture(page, { intercept: async (name, route, json) => {
+    if (name === 'app_snapshot') { await json(route, { message: 'Unavailable' }, 503); return true; }
+  } });
+  await page.clock.install();
+  await app.open();
+  await page.clock.fastForward(5000);
+  await expect(page.locator('#data-retry')).toBeVisible();
+  await expect(page.locator('#app')).toBeHidden();
+  app.intercept = null;
+  await page.clock.fastForward(60000);
+  await app.ready();
+});
+
+test('returning to a failed startup retries without a page reload', async ({ page }) => {
+  const app = await appFixture(page, { intercept: async (name, route, json) => {
+    if (name === 'app_snapshot') { await json(route, { message: 'Unavailable' }, 503); return true; }
+  } });
+  await app.open();
+  await expect(page.locator('#data-retry')).toBeVisible();
+  app.intercept = null;
+  await app.resume(); await app.ready();
+});
+
+test('authorization recovery replaces the JWT for all subsequent data requests', async ({ page }) => {
+  const tokens = [];
+  const app = await appFixture(page, { intercept: async (name, route, json) => {
+    if (name === 'bootstrap_account') {
+      tokens.push(route.request().headers().authorization);
+      if (app.calls[name] === 1) { await json(route, { code: '42501', message: 'Not authorized' }, 403); return true; }
+    }
+  } });
+  await app.open(); await app.ready();
+  expect(tokens).toHaveLength(2);
+  expect(tokens[0]).not.toBe(tokens[1]);
 });
 
 for (const operation of ['get-session', 'app_snapshot', 'wishlist_state', 'personal_archives', 'app_users']) {

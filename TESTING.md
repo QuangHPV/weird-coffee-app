@@ -26,7 +26,7 @@ still enforced by Neon; no policies, grants or production schema were relaxed.
 ## Automated checks
 
 - `npm test`: 18 tests for backlog helpers and loading orchestration.
-- `npm run test:browser`: 32 mobile Chrome tests. The API and permission responses
+- `npm run test:browser`: 35 mobile Chrome tests. The API and permission responses
   are intercepted locally; this suite cannot create production accounts or data.
 - `npm run build` and `git diff --check`.
 
@@ -99,3 +99,46 @@ After permission is granted, reopening the app synchronizes its subscription.
 Android controls notification delivery; if website permission itself was denied,
 the browser's site permission may also need to be enabled. No backend migration
 is required for this release.
+
+## 2026-10-22 reliability follow-up
+
+The Mac's TCP Postgres requests exceeded 20 seconds, while a read-only HTTPS
+query against the same database took 40 ms. Neon reported no stalled queries.
+The catalog publication was pending since October 21. All nine roasters failed
+DNS lookup during the October 22 scheduled scan. These are transport failures;
+the snapshot was about 175 KB and the production branch about 33 MB.
+
+The Mac now uses parameterized HTTPS SQL with a total deadline, bounded
+concurrency and atomic batch transactions. A deliberately failing transaction on
+the isolated branch rolled back correctly. Wish-list/backlog reads recovered to
+about 55 ms. A real complete refresh succeeded for all nine roasters, processed
+11 labels with Claude, and published 159 beans. The desktop page rendered in
+259 ms while its external font, suggestions and cloud Wish list were stalled.
+Desktop browser checks also verify Retry without reloading and re-enabling
+editing when sync returns with the same revision.
+
+Mobile startup errors previously stopped automatic polling because the app was
+still hidden. Resume and minute polling now recover that state. Authorization
+recovery explicitly requests a data JWT through the managed Auth token endpoint;
+refreshing the cookie session alone could reuse the same data token. All queries
+in one read bundle use one token, and sign-out/account changes clear it from
+memory. Browser regressions cover startup recovery and verify that a 42501 retry
+actually uses a different token.
+
+The built service worker now precaches the entry JavaScript and CSS before
+activating or replacing cached HTML. Each build has a separate shell cache, and
+same-origin network requests fall back after a six-second deadline. This avoids
+an offline shell pointing at missing bundles. The real test account passed ten
+reloads, five resumes, an offline reload and reconnect without page errors or a
+manual recovery reload. A first bootstrap call still intermittently returns
+403/42501 from the Data API; the client recovered by requesting a fresh JWT.
+The underlying API identity failure has not been established as a capacity or
+policy problem. No production policies or schema were changed.
+
+Archive sync follow-up: publication previously replaced the owner's cloud
+archives with the local SQLite copy, potentially undoing phone choices. Owner
+archives now use the same cloud authority as member archives. Desktop writes are
+confirmed remotely before updating the local cache, phone choices are pulled
+every 30 seconds, and the desktop data fingerprint includes archive IDs. Tests
+cover read/write failures, preserving unrelated choices, fingerprint changes,
+and ensuring catalog publication does not replace owner archives.

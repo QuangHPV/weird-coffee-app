@@ -49,6 +49,10 @@ try {
     if (await page.locator('#tour-skip').isVisible()) await page.locator('#tour-skip').click();
     await ready();
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await expect.poll(() => page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return registration?.active?.scriptURL.includes('build=');
+    })).toBe(true);
     console.log('REAL PWA: signed in, catalog loaded, service worker active');
     for (let i = 0; i < 10; i++) {
       await page.reload();
@@ -64,10 +68,16 @@ try {
     console.log('REAL RESUMES: 5 passed');
     await context.setOffline(true);
     await expect(page.locator('#data-status')).toContainText('Offline');
+    const assets = await page.locator('script[type=module][src], link[rel=stylesheet]').evaluateAll(elements => elements.map(element => element.src || element.href));
+    for (const asset of assets) expect(await page.evaluate(async url => (await fetch(url)).ok, asset)).toBe(true);
+    await page.reload();
+    if (await page.locator('#introSkip').isVisible()) await page.locator('#introSkip').click();
+    await expect(page.locator('#data-status')).toContainText('Offline');
+    console.log('REAL OFFLINE RELOAD: entry bundles available, app booted without network');
     await context.setOffline(false);
     await ready();
     console.log('REAL RECONNECT: recovered automatically');
-    await page.screenshot({ path: '/tmp/coffee-mobile-system-font.png' });
+    await page.screenshot({ path: '/tmp/coffee-mobile-reliability.png' });
     await context.storageState({ path: sessionPath });
     chmodSync(sessionPath, 0o600);
   }

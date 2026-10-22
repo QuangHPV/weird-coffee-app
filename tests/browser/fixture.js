@@ -6,6 +6,7 @@ export async function appFixture(page, options = {}) {
   const beans = Array.from({ length: 20 }, (_, i) => ({ id: `bean-${i}`, roaster: 'Test Roaster', title: `Coffee ${i + 1}`, available: true, price: 20, grams: 250, per100g: 8, url: 'https://shop.example.invalid/coffee', label: { origins: ['Ethiopia'], process: ['Washed'], roast: 'light' } }));
   const state = { signedIn: true, calls: {}, errors: [], ranking: { ids: [], revision: 1 }, profile, beans, intercept: null, ...options };
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': 'http://127.0.0.1:5175', 'access-control-allow-credentials': 'true', 'access-control-expose-headers': 'set-auth-jwt' } });
+  const jwt = () => `${btoa('{}')}.${btoa(JSON.stringify({ sub: state.profile.user_id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 900, version: state.calls.token || 0 }))}.test`;
   page.on('pageerror', error => state.errors.push(error.message));
   page.on('console', message => { if (message.type() === 'warning' && message.text().includes('account load')) state.errors.push(message.text()); });
   await page.route('https://auth.example.invalid/**', async route => {
@@ -13,10 +14,10 @@ export async function appFixture(page, options = {}) {
     state.calls[operation] = (state.calls[operation] || 0) + 1;
     if (state.intercept && await state.intercept(operation, route, json)) return;
     if (operation === 'get-session') {
-      const jwt = `${btoa('{}')}.${btoa(JSON.stringify({ sub: user.id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 900 }))}.test`;
-      const data = state.signedIn ? { user: { ...user, id: state.profile.user_id }, session: { token: jwt, expiresAt: new Date(Date.now() + 3600000).toISOString() } } : null;
+      const data = state.signedIn ? { user: { ...user, id: state.profile.user_id }, session: { token: jwt(), expiresAt: new Date(Date.now() + 3600000).toISOString() } } : null;
       return json(route, data);
     }
+    if (operation === 'token') return json(route, { token: jwt() });
     if (operation === 'email') { state.signedIn = true; return json(route, { user, token: 'session-cookie' }); }
     if (operation === 'sign-out') { state.signedIn = false; return json(route, { success: true }); }
     return json(route, {});
