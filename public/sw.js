@@ -1,5 +1,16 @@
-const CACHE = 'another-cup-shell-v1';
-const SHELL = ['./', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
+const CACHE = 'another-cup-shell-v2';
+const SHELL = ['./', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
+  './fonts/bricolage-latin-ext.woff2',
+  './fonts/bricolage-latin.woff2',
+  './fonts/bricolage-vietnamese.woff2',
+  './fonts/bricolage.css',
+  './fonts/manrope-cyrillic-ext.woff2',
+  './fonts/manrope-cyrillic.woff2',
+  './fonts/manrope-greek.woff2',
+  './fonts/manrope-latin-ext.woff2',
+  './fonts/manrope-latin.woff2',
+  './fonts/manrope-vietnamese.woff2',
+  './fonts/manrope.css'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });

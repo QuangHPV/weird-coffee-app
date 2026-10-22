@@ -1050,15 +1050,10 @@ window.addEventListener('pointermove', event => {
 });
 window.addEventListener('pointerup', () => { if ((activeWishDrag || pendingWishDrag)?.kind === 'mouse') finishWishDrag(true); });
 window.addEventListener('pointercancel', () => { if ((activeWishDrag || pendingWishDrag)?.kind === 'mouse') finishWishDrag(false); });
-// Chrome Android vibrates when a page consumes a long-press contextmenu event.
-// CSS disables selection/callouts, and product links are buttons, so touch presses
-// can stay unconsumed. Preserve native selection menus in editable fields.
-let lastPointerWasTouch = false;
-document.addEventListener('pointerdown', event => { lastPointerWasTouch = event.pointerType === 'touch'; }, { capture: true, passive: true });
-document.addEventListener('contextmenu', event => {
-  if (event.pointerType === 'touch' || lastPointerWasTouch || event.target.closest('input,textarea,[contenteditable="true"]')) return;
-  event.preventDefault();
-});
+// Do not register a global contextmenu handler. Some Android browsers report a
+// long press as a mouse event; consuming it triggers a native haptic even when
+// no menu is displayed. CSS prevents selection outside editable fields, and
+// product destinations are buttons without a native link-preview menu.
 
 function move(index, direction) {
   const order = [...wishShown];

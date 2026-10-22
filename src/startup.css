@@ -11,7 +11,7 @@
   overflow: hidden;
   background: var(--intro-paper);
   color: var(--intro-ink);
-  font-family: Nunito, system-ui, sans-serif;
+  font-family: var(--app-font, system-ui), sans-serif;
   animation: intro-exit 3.15s both;
 }
 
@@ -204,7 +204,7 @@
   border-radius: 999px;
   background: #f8f0e5;
   color: var(--intro-ink);
-  font: 700 12px Nunito, system-ui, sans-serif;
+  font: 700 12px var(--app-font, system-ui), sans-serif;
   cursor: pointer;
 }
 .intro-skip:focus-visible { outline: 3px solid var(--intro-berry); outline-offset: 3px; }

@@ -13,7 +13,7 @@ async function touch(page, locator, hold = 600, move = false) {
   await cdp.detach();
 }
 
-test('holding card text or blank space neither drags nor vibrates', async ({ page }) => {
+test('holding card text neither drags nor requests app vibration', async ({ page }) => {
   await page.addInitScript(() => { window.__vibrations = 0; navigator.vibrate = () => { window.__vibrations++; return true; }; });
   const app = await appFixture(page);
   await app.open(); await app.ready();
@@ -42,29 +42,45 @@ test('scrolling from the heart cancels a pending drag', async ({ page }) => {
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 });
 
-test('touch context menus are not consumed; text fields retain native selection', async ({ page }) => {
+test('long-press menus stay unconsumed even when Android reports mouse or no pointer type', async ({ page }) => {
   const app = await appFixture(page);
   await app.open(); await app.ready();
-  const result = await page.locator('.bean-title').first().evaluate(element => {
-    const event = new PointerEvent('contextmenu', { bubbles: true, cancelable: true, pointerType: 'touch' });
-    element.dispatchEvent(event);
-    return { prevented: event.defaultPrevented, selection: getComputedStyle(element).userSelect };
-  });
-  expect(result).toEqual({ prevented: false, selection: 'none' });
+  for (const pointerType of ['touch', 'mouse', '']) {
+    const result = await page.locator('.bean-title').first().evaluate((element, pointerType) => {
+      const event = new PointerEvent('contextmenu', { bubbles: true, cancelable: true, pointerType });
+      element.dispatchEvent(event);
+      return { prevented: event.defaultPrevented, selection: getComputedStyle(element).userSelect };
+    }, pointerType);
+    expect(result).toEqual({ prevented: false, selection: 'none' });
+  }
   await page.locator('#open-filters').click();
   expect(await page.locator('#filter-search').evaluate(element => getComputedStyle(element).userSelect)).toBe('text');
   await expect(page.locator('a[href]')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'View bean ↗' }).first()).toHaveJSProperty('tagName', 'BUTTON');
 });
 
-test('system font, narrow layout, and no external font requests', async ({ page }) => {
+test('bundled heading and body fonts load without external requests or narrow-screen overflow', async ({ page }) => {
   const fonts = [];
   page.on('request', request => { if (/fonts\.google|fontshare/.test(request.url())) fonts.push(request.url()); });
   const app = await appFixture(page);
   app.beans[0].title = 'A particularly long Ethiopian coffee name from a small cooperative';
   await page.setViewportSize({ width: 320, height: 740 });
   await app.open(); await app.ready();
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontFamily)).toContain('system-ui');
+  await page.evaluate(() => document.fonts.ready);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).fontFamily)).toContain('Manrope');
+  expect(await page.locator('.bean-title').first().evaluate(element => getComputedStyle(element).fontFamily)).toContain('Bricolage Grotesque');
+  expect(await page.evaluate(() => ['Manrope', 'Bricolage Grotesque'].every(family => [...document.fonts].some(font => font.family.replaceAll('"', '') === family && font.status === 'loaded')))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(fonts).toEqual([]);
+});
+
+test('the real service worker keeps both fonts available offline', async ({ page, context }) => {
+  const app = await appFixture(page);
+  await app.open(); await app.ready();
+  await page.evaluate(async () => { await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready; });
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  const paths = ['/fonts/manrope.css', '/fonts/bricolage.css', '/fonts/manrope-latin.woff2', '/fonts/bricolage-latin.woff2'];
+  for (const path of paths) expect(await page.evaluate(async path => Boolean(await caches.match(path)), path)).toBe(true);
+  await context.setOffline(true);
+  for (const path of paths) expect(await page.evaluate(async path => (await fetch(path)).ok, path)).toBe(true);
 });

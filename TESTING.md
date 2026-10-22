@@ -26,7 +26,7 @@ still enforced by Neon; no policies, grants or production schema were relaxed.
 ## Automated checks
 
 - `npm test`: 18 tests for backlog helpers and loading orchestration.
-- `npm run test:browser`: 31 mobile Chrome tests. The API and permission responses
+- `npm run test:browser`: 32 mobile Chrome tests. The API and permission responses
   are intercepted locally; this suite cannot create production accounts or data.
 - `npm run build` and `git diff --check`.
 
@@ -39,11 +39,14 @@ data during a failed refresh. Unit tests additionally cover permanently stalled
 recovery, cancellation, retry limits and permanent permission/data-format errors.
 
 Touch checks cover holding card text, holding the heart, cancellation when
-scrolling, no duplicate save after a drag, unconsumed touch context menus,
+scrolling, no duplicate save after a drag, unconsumed context menus with touch,
+mouse or missing pointer types,
 selection remaining available in text inputs, and no `navigator.vibrate` calls.
 The heart-hold check was repeated eight times after waiting for the startup
-overlay to disappear; all eight passed. Layout and system-font checks include a
-320px screen and a long coffee name, with no remote font requests.
+overlay to disappear; all eight passed. Layout and bundled-font checks include a
+320px screen and a long coffee name, with no remote font requests. Both Manrope
+and Bricolage Grotesque must actually finish loading. A real service worker test
+also verifies that their stylesheets and fonts remain available offline.
 
 Notification tests cover installation detection, an explicit tap before browser
 permission, persistent dismissal, denied/unsupported permission, later permission
@@ -76,12 +79,19 @@ during investigation; its temporary probe exists only on the test branch.
 
 Mac touch emulation cannot feel an Android vibration motor or reproduce the
 Android system permission sheet. The app's explicit vibration is removed, and
-touch long presses are no longer consumed by the blanket context-menu blocker.
+the global context-menu blocker is now removed entirely. Its previous fallback
+still consumed events reported as mouse events or without a pointer type; those
+cases now have regression coverage.
 Chromium's Android implementation vibrates on consumed long-press events:
 [GestureListenerManagerImpl](https://github.com/chromium/chromium/blob/main/content/public/android/java/src/org/chromium/content/browser/GestureListenerManagerImpl.java#L339-L342).
 Product destinations use accessible link-role buttons, avoiding native link
 previews while retaining tap and keyboard activation. Native scroll and pinch
 zoom are preserved.
+
+An Android API 35 emulator was also attempted on this Mac. Its host connection
+and native input service repeatedly stalled. DevTools touch injection did not
+produce Android's native long-press event, so that attempt cannot establish that
+the phone's native haptic is fixed. Physical Android verification is still needed.
 
 The installed app offers Enable / Not now once. A tap is required by the
 [browser permission API](https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API/Using_the_Notifications_API).
