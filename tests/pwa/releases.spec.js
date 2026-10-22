@@ -19,6 +19,7 @@ function release(id) {
       for (const [old, next] of names) html = html.replaceAll(old, next);
       bytes = Buffer.from(html);
     }
+    if (asset.url === 'fonts/manrope.css') bytes = Buffer.concat([bytes, Buffer.from(`\n/* font-release-${id} */`)]);
     files.set(names.get(asset.url), bytes);
   }
   const data = { id, assets: [...files].map(([url, bytes]) => ({ url, sha256: digest(bytes) })) };
@@ -140,6 +141,8 @@ test('multiple tabs update together and an old release stays available while a d
   state.id = 'B'; await detect(page); await detect(second);
   await expect.poll(() => current(page), { timeout: 20000 }).toBe('B');
   expect(await current(second)).toBe('A');
+  expect(await second.evaluate(async () => (await fetch('./fonts/manrope.css')).text())).toContain('font-release-A');
+  expect(await page.evaluate(async () => (await fetch('./fonts/manrope.css')).text())).toContain('font-release-B');
   const css = await second.locator('link[rel=stylesheet]').first().getAttribute('href');
   expect(await second.evaluate(async path => (await fetch(path)).ok, css)).toBe(true);
   await second.getByRole('button', { name: 'Reload now' }).click();

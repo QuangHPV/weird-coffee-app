@@ -71,8 +71,15 @@ self.addEventListener('fetch', event => {
   // Release discovery must always observe the server, never a cached manifest.
   if (url.pathname === new URL('release.json', scope).pathname) return;
   event.respondWith((async () => {
-    const cache = await caches.open(CACHE);
+    let cache = await caches.open(CACHE);
     const navigation = event.request.mode === 'navigate';
+    // An old open page also needs its own unversioned font stylesheets/files.
+    if (!navigation && event.clientId) {
+      const saved = await (await caches.open(META)).match(urlOf('__client__/' + event.clientId));
+      const id = saved && await saved.text();
+      const name = PREFIX + 'v4-' + id;
+      if (id && await caches.has(name)) cache = await caches.open(name);
+    }
     const key = navigation ? urlOf('index.html') : event.request;
     const cached = await cache.match(key);
     if (cached) return cached;
