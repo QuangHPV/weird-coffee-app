@@ -8,9 +8,6 @@
   <meta name="theme-color" content="#17120f" media="(prefers-color-scheme: dark)">
   <meta name="description" content="Browse Singapore coffee beans and keep your Wish list in sync.">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400..800&display=swap">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <title>Another Cup</title>
@@ -24,8 +21,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-fnlQI2ft.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BI8Thwkx.css">
+  <script type="module" crossorigin src="./assets/index-NEPbuIBf.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C90NC47A.css">
 </head>
 <body>
   <div id="startupIntro" class="startup-intro" role="dialog" aria-modal="true" aria-label="Another Cup opening animation">
@@ -49,9 +46,10 @@
   </div>
   <header class="topbar">
     <h1>Find your next bag</h1>
-    <div class="toptools"><span id="network" role="status">Connecting…</span><button id="notify" type="button" aria-label="Notifications" title="Notifications" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path class="slash" d="M4 4l16 16"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
+    <div class="toptools"><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
   </header>
   <main>
+    <div id="data-status" class="notice data-status" role="status" hidden><span id="data-message"></span><button id="data-retry" type="button">Retry</button></div>
     <section id="auth" class="auth-panel" hidden>
       <h2>Sign in</h2>
       <p>Sign in with your private coffee account.</p>
@@ -60,10 +58,14 @@
         <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
         <button id="auth-submit" class="primary" type="submit">Sign in</button>
       </form>
-      <button id="auth-retry" class="primary" type="button" hidden>Try again</button>
       <p id="auth-error" class="error" role="alert" hidden></p>
     </section>
     <section id="app" hidden>
+      <section id="push-prompt" class="notice push-prompt" aria-labelledby="push-title" hidden>
+        <h3 id="push-title">Enable notifications?</h3><p>New beans from your roasters and restocks from your Wish list.</p>
+        <div><button id="push-enable" class="primary" type="button">Enable</button><button id="push-dismiss" type="button">Not now</button></div>
+        <p id="push-message" role="status"></p>
+      </section>
       <div id="notice" class="notice" role="status" hidden></div>
       <section id="roaster-setup" class="account-setup" aria-labelledby="setup-heading" hidden>
         <span class="eyebrow">Your coffee</span><h2 id="setup-heading">Choose your roasters</h2>

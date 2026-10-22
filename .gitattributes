@@ -1,0 +1,2 @@
+# Bundled dependencies can contain significant whitespace inside template literals.
+docs/assets/* -whitespace linguist-generated=true

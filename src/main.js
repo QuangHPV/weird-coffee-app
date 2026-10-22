@@ -1,9 +1,11 @@
 import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthVanillaAdapter } from '@neondatabase/neon-js/auth/vanilla/adapters';
+import { createDataLoader, LoadError, SessionEnded, readResult } from './data-loader.js';
 import './startup.js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
 import { reloadWhenIdle, saveSpot, takeSpot } from './live-update.js';
-import { pushSupported, pushEnabled, enablePush, disablePush } from './push.js';
+import { mountPushPrompt } from './push.js';
 
 const $ = id => document.getElementById(id);
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
@@ -11,7 +13,7 @@ const demoMember = demoMode && new URLSearchParams(location.search).get('demo') 
 const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
 const dataApiUrl = import.meta.env.VITE_NEON_DATA_API_URL;
 const client = authUrl && dataApiUrl ? createClient({
-  auth: { url: authUrl },
+  auth: { url: authUrl, adapter: BetterAuthVanillaAdapter({ fetchOptions: { timeout: 12000 } }) },
   dataApi: { url: dataApiUrl }
 }) : null;
 let snapshot = null;
@@ -23,6 +25,7 @@ let tourStep = 0;
 let requests = [];
 let saving = false;
 let savingFilters = false;
+let savingArchive = false;
 let decisions = [];            // replacement choices made on a device, not yet applied by the Mac
 let deciding = false;
 let view = 'browse';
@@ -126,10 +129,11 @@ function safeLink(url, label) {
   try {
     const parsed = new URL(url);
     if (!['https:', 'http:'].includes(parsed.protocol)) return null;
-    const link = node('a', '', label);
-    link.href = parsed.href;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
+    // A button avoids Android's native link-preview long press and its haptic.
+    const link = node('button', 'external-link', label);
+    link.type = 'button';
+    link.setAttribute('role', 'link');
+    link.onclick = () => window.open(parsed.href, '_blank', 'noopener,noreferrer');
     return link;
   } catch { return null; }
 }
@@ -146,15 +150,16 @@ function notice(message) {
 }
 
 function updateNetwork() {
-  $('network').textContent = demoMode ? 'Preview' : navigator.onLine ? 'Online' : 'Offline';
-  $('network').classList.toggle('error', !demoMode && !navigator.onLine);
+  if (!demoMode && !navigator.onLine) setLoadState({ status: 'offline' });
   renderBrowse();
   renderWishlist();
 }
 window.addEventListener('online', () => { updateNetwork(); loadData(); });
 window.addEventListener('offline', updateNetwork);
 
-function showSignedOut() {
+function showSignedOut({ cancelLoad = true } = {}) {
+  if (cancelLoad) cancelAccountLoad();
+  pushPrompt.reset();
   snapshot = null;
   ranking = null;
   profile = null;
@@ -168,18 +173,104 @@ function showSignedOut() {
   $('app').hidden = true;
   $('navigation').hidden = true;
   $('signout').hidden = true;
-  $('notify').hidden = true;
   $('auth-form').hidden = false;
-  $('auth-retry').hidden = true;
 }
 
 function showSignedIn() {
   $('auth').hidden = true;
   $('app').hidden = false;
-  $('navigation').hidden = false;
+  $('navigation').hidden = showingSetup;
   $('signout').hidden = demoMode;
-  showNotifyButton();
 }
+
+async function accountSession() {
+  const result = await client.auth.getSession({ fetchOptions: { headers: { 'X-Force-Fetch': 'true' }, timeout: 12000 } });
+  const data = readResult('session', result);
+  if (!data?.session || !data.user?.id) throw new SessionEnded();
+  return data.user.id;
+}
+
+function setLoadState({ status, quiet = false, expired = false }) {
+  const box = $('data-status');
+  const loading = status === 'loading' || status === 'retrying';
+  box.hidden = status === 'ready' || status === 'signed-out' || loading && !!snapshot;
+  $('data-retry').hidden = loading;
+  $('data-retry').disabled = !navigator.onLine;
+  $('data-message').textContent = status === 'offline'
+    ? snapshot ? 'Offline. Showing your last loaded data.' : 'Offline. Reconnect to load your coffee.'
+    : loading ? status === 'retrying' ? 'Still connecting…' : 'Loading your coffee…'
+    : snapshot ? 'Could not refresh. Showing your last loaded data.' : 'Could not load your coffee. Try again.';
+  $('app').setAttribute('aria-busy', String(loading));
+  if (status === 'signed-out') {
+    const wasSignedIn = !!profile;
+    showSignedOut();
+    if (expired || wasSignedIn) {
+      $('auth-error').textContent = 'Your session has ended. Sign in again.';
+      $('auth-error').hidden = false;
+    }
+  }
+}
+
+const accountLoader = createDataLoader({
+  async read(signal) {
+    const userId = await accountSession();
+    if (signal.aborted) throw signal.reason;
+    if (profile && profile.user_id !== userId) {
+      showSignedOut({ cancelLoad: false });
+      $('auth').hidden = true;
+      setLoadState({ status: 'loading' });
+    }
+    const initial = profile?.user_id === userId ? profile : readResult('account setup', await client.rpc('bootstrap_account').abortSignal(signal));
+    const initialized = Array.isArray(initial) ? initial[0] : initial;
+    const specs = [
+      ['catalog', client.from('app_snapshot').select('payload,published_at').eq('id', 1)],
+      ['wish list', client.from('wishlist_state').select('ids,revision,updated_at')],
+      ['archives', client.from('personal_archives').select('bean_id')],
+      ['profile', client.from('app_users').select('user_id,role,display_name,roasters,setup_complete,filter_state,filter_revision,tour_complete')]
+    ];
+    const [catalog, wish, archives, profiles] = await Promise.all(specs.map(async ([name, query]) =>
+      readResult(name, await query.abortSignal(signal))));
+    // Never install half a bundle or an empty RLS result as a successful load.
+    if (!catalog?.length || !wish?.length || !profiles?.length || profiles[0].user_id !== userId) {
+      throw new LoadError('account data', { code: 'DATA_NOT_READY', message: 'Account data is not ready' });
+    }
+    const payload = catalog[0].payload;
+    if (!Array.isArray(payload?.beans) || !Array.isArray(payload?.runs) || !Array.isArray(wish[0].ids)) {
+      throw new LoadError('data format', { code: 'INVALID_DATA' });
+    }
+    const choices = await client.from('replacement_decisions').select('old_id,new_id').abortSignal(signal);
+    return { catalog: catalog[0], wish: wish[0], archives, profile: { ...initialized, ...profiles[0] },
+      decisions: choices.error ? decisions : choices.data };
+  },
+  apply(bundle) {
+    const nextProfile = bundle.profile;
+    const signature = `${nextProfile.user_id}|${bundle.catalog.published_at}|${bundle.wish.revision}|${bundle.archives.map(row => row.bean_id).sort().join(',')}|${nextProfile.filter_revision}|${nextProfile.tour_complete}|${JSON.stringify(bundle.decisions)}`;
+    profile = nextProfile;
+    showSignedIn();
+    if (signature === loadedSignature) { if (view === 'backlog') refreshBacklogView(); pushPrompt.update(profile); return; }
+    loadedSignature = signature;
+    decisions = bundle.decisions;
+    ranking = bundle.wish;
+    archiveIds = new Set(bundle.archives.map(row => row.bean_id));
+    snapshot = { ...bundle.catalog.payload, beans: bundle.catalog.payload.beans.map(bean => ({ ...bean, archived: archiveIds.has(bean.id) })) };
+    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
+    $('published').textContent = `Updated ${date(bundle.catalog.published_at)}`;
+    showingSetup = !profile.setup_complete;
+    renderSetup(); buildFilters(); render();
+    if (profile.role === 'member' && profile.setup_complete && !profile.tour_complete && !tourStep) startTour();
+    else renderTour();
+    if (view === 'backlog') refreshBacklogView();
+    restoreSpot();
+    pushPrompt.update(profile);
+  },
+  refreshSession: accountSession,
+  state: setLoadState
+});
+function cancelAccountLoad() {
+  accountLoader.reset();
+  $('app').setAttribute('aria-busy', 'false');
+}
+$('data-retry').onclick = () => loadData();
 
 // `quiet` is the background check: it redraws only when the published data or the Wish list changed.
 let loadedSignature = '';
@@ -198,58 +289,8 @@ async function loadData({ quiet = false } = {}) {
     if (view === 'backlog') backlog.refresh();
     return;
   }
-  if (!client || !navigator.onLine) {
-    notice(navigator.onLine ? 'Set the public Neon Auth and Data API URLs before publishing this app.' : 'Connect to load your beans and Wish list.');
-    return;
-  }
-  try {
-    if (!profile) {
-      const initialized = await client.rpc('bootstrap_account');
-      if (initialized.error) throw initialized.error;
-      profile = Array.isArray(initialized.data) ? initialized.data[0] : initialized.data;
-      appliedFilters = savedFilters(profile.filter_state, profile.roasters);
-    }
-    const [snapResult, wishResult, archiveResult, profileResult] = await Promise.all([
-      client.from('app_snapshot').select('payload,published_at').eq('id', 1),
-      client.from('wishlist_state').select('ids,revision,updated_at'),
-      client.from('personal_archives').select('bean_id'),
-      client.from('app_users').select('role,display_name,roasters,setup_complete,filter_state,filter_revision,tour_complete')
-    ]);
-    if (snapResult.error) throw snapResult.error;
-    if (wishResult.error) throw wishResult.error;
-    if (archiveResult.error) throw archiveResult.error;
-    if (profileResult.error) throw profileResult.error;
-    if (!snapResult.data?.length || !wishResult.data?.length) {
-      notice('The catalog is not ready yet. Try again shortly.');
-      return;
-    }
-    profile = { ...profile, ...profileResult.data[0] };
-    const signature = `${snapResult.data[0].published_at}|${wishResult.data[0].revision}|${archiveResult.data.map(row => row.bean_id).sort().join(',')}|${profile.filter_revision}|${profile.tour_complete}`;
-    if (quiet && signature === loadedSignature) {
-      if (view === 'backlog') { if (profile.role === 'admin') backlog.refresh(); else refreshRequests(); }
-      return;
-    }
-    loadedSignature = signature;
-    const decided = await client.from('replacement_decisions').select('old_id,new_id');
-    decisions = decided.error ? [] : decided.data;   // the table may not exist yet
-    snapshot = snapResult.data[0].payload;
-    ranking = wishResult.data[0];
-    archiveIds = new Set(archiveResult.data.map(row => row.bean_id));
-    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
-    if (!Array.isArray(snapshot.beans) || !Array.isArray(snapshot.runs) || !Array.isArray(ranking.ids)) throw new Error('Invalid data');
-    snapshot = { ...snapshot, beans: snapshot.beans.map(bean => ({ ...bean, archived: archiveIds.has(bean.id) })) };
-    $('published').textContent = `Updated ${date(snapResult.data[0].published_at)}`;
-    if (!profile.setup_complete) showingSetup = true;
-    renderSetup();
-    buildFilters();
-    render();
-    notice('');
-    if (profile.role === 'member' && profile.setup_complete && !profile.tour_complete && !tourStep) startTour();
-    else renderTour();
-    if (view === 'backlog') refreshBacklogView();
-  } catch {
-    if (!quiet) notice('Could not load the latest data. Reconnect and reopen the app to try again.');
-  }
+  if (snapshot && (saving || savingFilters || savingArchive || deciding || activeWishDrag || pendingWishDrag || document.body.classList.contains('filters-open'))) return false;
+  if (client) return accountLoader.load({ quiet });
 }
 
 function renderSetup() {
@@ -271,6 +312,7 @@ $('roaster-form').onsubmit = async event => {
   event.preventDefault();
   const chosen = [...$('setup-roasters').querySelectorAll('input:checked')].map(box => box.value);
   if (!chosen.length) { notice('Choose at least one roaster.'); return; }
+  cancelAccountLoad();
   $('save-roasters').disabled = true;
   try {
     if (demoMode) profile = { ...profile, roasters: chosen, setup_complete: true, filter_revision: profile.filter_revision + 1 };
@@ -310,6 +352,7 @@ function renderTour() {
 }
 
 async function finishTour() {
+  cancelAccountLoad();
   if (!demoMode) {
     const result = await client.rpc('complete_account_guide');
     if (result.error) { notice('Could not save the guide progress. Reconnect and try again.'); return; }
@@ -318,6 +361,7 @@ async function finishTour() {
   tourStep = 0;
   renderTour();
   if (!$('filter-overlay').hidden) closeFilters();
+  pushPrompt.update(profile);
 }
 
 $('tour-next').onclick = () => {
@@ -617,13 +661,16 @@ function beanCard(bean) {
   heart.setAttribute('aria-pressed', String(!!saved));
   heart.setAttribute('aria-label', `${saved ? 'Remove from' : 'Add to'} Wish list: ${bean.title}`);
   heart.disabled = !ranking || saving || !navigator.onLine;
-  heart.onclick = () => saveRanking(saved ? ranking.ids.filter(id => id !== bean.id) : [...ranking.ids, bean.id]);
+  heart.onclick = () => {
+    if (activeWishDrag || Date.now() < suppressHeartClickUntil) return;
+    saveRanking(saved ? ranking.ids.filter(id => id !== bean.id) : [...ranking.ids, bean.id]);
+  };
   top.append(titleBox, heart);
   if (profile?.role === 'member') {
     const archive = node('button', 'archive-action', bean.archived ? 'Restore' : 'Archive');
     archive.type = 'button';
     archive.setAttribute('aria-label', `${bean.archived ? 'Restore' : 'Archive'}: ${bean.title}`);
-    archive.disabled = !navigator.onLine;
+    archive.disabled = !navigator.onLine || savingArchive;
     archive.onclick = () => setArchive(bean, !bean.archived);
     top.append(archive);
   }
@@ -651,6 +698,10 @@ function beanCard(bean) {
 }
 
 async function setArchive(bean, archived) {
+  if (savingArchive || !navigator.onLine) return;
+  savingArchive = true;
+  cancelAccountLoad();
+  renderBrowse();
   try {
     if (!demoMode) {
       const result = await client.rpc('set_personal_archive', { listing: bean.id, do_archive: archived });
@@ -660,6 +711,7 @@ async function setArchive(bean, archived) {
     snapshot = { ...snapshot, beans: snapshot.beans.map(item => item.id === bean.id ? { ...item, archived } : item) };
     render(); notice('');
   } catch (error) { notice(error.message || 'Could not update archive.'); }
+  finally { savingArchive = false; renderBrowse(); }
 }
 
 // Pending "same lot, new listing" suggestions that nobody has decided yet.
@@ -706,6 +758,7 @@ function replacePair(item) {
 async function decideReplacement(item, accept) {
   if (deciding || !navigator.onLine) return;
   deciding = true;
+  cancelAccountLoad();
   render();
   try {
     if (demoMode) {
@@ -840,6 +893,7 @@ $('wish-in-stock').onchange = event => {
 
 let pendingWishDrag = null;
 let activeWishDrag = null;
+let suppressHeartClickUntil = 0;
 const wishList = $('wish-list');
 
 function cancelPendingWishDrag() {
@@ -849,6 +903,7 @@ function cancelPendingWishDrag() {
 
 function startWishDrag(item, x, y, kind, identifier = null) {
   if (pendingWishDrag || activeWishDrag || saving || !navigator.onLine || ranking.ids.length < 2) return;
+  cancelAccountLoad();
   pendingWishDrag = { item, x, y, kind, identifier, timer: setTimeout(() => {
     const pending = pendingWishDrag;
     if (!pending || !wishList.contains(pending.item)) return;
@@ -867,11 +922,12 @@ function startWishDrag(item, x, y, kind, identifier = null) {
   }, 320) };
 }
 
-// Press and hold a Browse card that is not saved yet: the card shrinks to a chip, the Wish list
+// Press and hold an unsaved heart: the card shrinks to a chip, the Wish list
 // opens, and the bean is added where the chip is released.
 function startAddDrag(card, x, y, kind, identifier = null) {
   const bean = snapshot?.beans.find(value => value.id === card.dataset.beanId);
-  if (!bean || ranking?.ids.includes(bean.id) || pendingWishDrag || activeWishDrag || saving || !navigator.onLine) return;
+  if (!bean || tourStep || showingSetup || ranking?.ids.includes(bean.id) || pendingWishDrag || activeWishDrag || saving || !navigator.onLine) return;
+  cancelAccountLoad();
   pendingWishDrag = { item: card, x, y, kind, identifier, timer: setTimeout(() => {
     if (!pendingWishDrag || pendingWishDrag.item !== card) return;
     pendingWishDrag = null;
@@ -891,7 +947,6 @@ function startAddDrag(card, x, y, kind, identifier = null) {
     activeWishDrag = { item: slot, ghost: chip, offsetY: 26, y, kind, identifier, adding: bean };
     reorderWishAt(y);
     activeWishDrag.frame = requestAnimationFrame(autoScrollWishList);
-    navigator.vibrate?.(12);
   }, 320) };
 }
 
@@ -932,6 +987,7 @@ function finishWishDrag(save) {
   drag.item.classList.remove('wish-placeholder');
   document.body.classList.remove('wish-reordering');
   if (drag.adding) {
+    suppressHeartClickUntil = Date.now() + 600;
     // A bean dragged in from Browse: insert it after the shown bean just above the drop spot.
     const shown = [...wishList.querySelectorAll(':scope > .wish-item')].map(item => item.dataset.id);
     const above = shown[shown.indexOf(drag.adding.id) - 1];
@@ -949,12 +1005,12 @@ function finishWishDrag(save) {
 
 $('bean-list').addEventListener('touchstart', event => {
   const card = event.target.closest('.bean-card');
-  if (!card || event.target.closest('button,a') || event.touches.length !== 1) return;
+  if (!card || !event.target.closest('.heart:not(.saved)') || event.touches.length !== 1) return;
   const touch = event.changedTouches[0];
   startAddDrag(card, touch.clientX, touch.clientY, 'touch', touch.identifier);
 }, { passive: true });
 $('bean-list').addEventListener('pointerdown', event => {
-  if (event.pointerType !== 'mouse' || event.button !== 0 || event.target.closest('button,a')) return;
+  if (event.pointerType !== 'mouse' || event.button !== 0 || !event.target.closest('.heart:not(.saved)')) return;
   const card = event.target.closest('.bean-card');
   if (card) startAddDrag(card, event.clientX, event.clientY, 'mouse');
 });
@@ -972,6 +1028,7 @@ window.addEventListener('touchmove', event => {
   if (activeWishDrag) { event.preventDefault(); moveWishDrag(touch.clientY); }
   else if (Math.hypot(touch.clientX - state.x, touch.clientY - state.y) > 9) cancelPendingWishDrag();
 }, { passive: false });
+window.addEventListener('touchstart', event => { if (event.touches.length > 1) finishWishDrag(false); }, { passive: true });
 window.addEventListener('touchend', event => {
   const state = activeWishDrag || pendingWishDrag;
   if (state?.kind === 'touch' && [...event.changedTouches].some(touch => touch.identifier === state.identifier)) finishWishDrag(true);
@@ -993,9 +1050,15 @@ window.addEventListener('pointermove', event => {
 });
 window.addEventListener('pointerup', () => { if ((activeWishDrag || pendingWishDrag)?.kind === 'mouse') finishWishDrag(true); });
 window.addEventListener('pointercancel', () => { if ((activeWishDrag || pendingWishDrag)?.kind === 'mouse') finishWishDrag(false); });
-// Long-press opens the browser menu (copy, search, open link); keep it for text fields only.
-document.addEventListener('contextmenu', event => { if (!event.target.closest('input, textarea')) event.preventDefault(); });
-wishList.addEventListener('contextmenu', event => { if (activeWishDrag) event.preventDefault(); });
+// Chrome Android vibrates when a page consumes a long-press contextmenu event.
+// CSS disables selection/callouts, and product links are buttons, so touch presses
+// can stay unconsumed. Preserve native selection menus in editable fields.
+let lastPointerWasTouch = false;
+document.addEventListener('pointerdown', event => { lastPointerWasTouch = event.pointerType === 'touch'; }, { capture: true, passive: true });
+document.addEventListener('contextmenu', event => {
+  if (event.pointerType === 'touch' || lastPointerWasTouch || event.target.closest('input,textarea,[contenteditable="true"]')) return;
+  event.preventDefault();
+});
 
 function move(index, direction) {
   const order = [...wishShown];
@@ -1012,6 +1075,7 @@ async function saveRanking(ids) {
   }
   const previousRanking = ranking;
   saving = true;
+  cancelAccountLoad();
   ranking = { ...ranking, ids };
   renderBrowse(); renderWishlist();
   try {
@@ -1130,6 +1194,7 @@ function setView(next) {
 
 document.querySelectorAll('nav button').forEach(button => button.onclick = () => setView(button.dataset.view));
 function openFilters() {
+  cancelAccountLoad();
   draftFilters = cloneFilters(appliedFilters);
   const availableRoasters = new Set(snapshot.beans.map(bean => bean.roaster));
   draftFilters.roasters = Object.fromEntries(Object.keys(draftFilters.roasters)
@@ -1155,6 +1220,7 @@ async function applyFilters() {
   if (!chosen.length) { $('filter-results').textContent = 'Choose at least one roaster.'; return; }
   if (!demoMode && !navigator.onLine) { $('filter-results').textContent = 'Reconnect to save filters.'; return; }
   savingFilters = true;
+  cancelAccountLoad();
   $('filter-apply').disabled = true;
   try {
     if (demoMode) profile = { ...profile, roasters: chosen, filter_state: portableFilters(draftFilters), filter_revision: profile.filter_revision + 1 };
@@ -1216,7 +1282,6 @@ $('auth-form').onsubmit = async event => {
     });
     if (result?.error) throw result.error;
     $('password').value = '';
-    showSignedIn();
     await loadData();
   } catch (error) {
     $('auth-error').textContent = error.message || 'Could not sign in.';
@@ -1225,49 +1290,20 @@ $('auth-form').onsubmit = async event => {
     $('auth-submit').disabled = false;
   }
 };
-// The bell: phone notifications on or off. Hidden where the browser cannot do push.
-async function showNotifyButton() {
-  const button = $('notify');
-  button.hidden = demoMode || !client || !pushSupported();
-  if (button.hidden) return;
-  button.classList.toggle('on', await pushEnabled().catch(() => false));
-}
-$('notify').onclick = async () => {
-  const button = $('notify');
-  button.disabled = true;
-  try {
-    if (button.classList.contains('on')) await disablePush(client);
-    else if (!await enablePush(client)) notice('Notifications are blocked. Allow them in the browser settings.');
-  } catch (error) {
-    notice(`Could not change notifications. (${error?.message || 'unknown error'})`);
-  }
-  button.disabled = false;
-  showNotifyButton();
-};
+const pushPrompt = mountPushPrompt({ client, panel: $('push-prompt'), enable: $('push-enable'), dismiss: $('push-dismiss'), message: $('push-message'), enabled: !demoMode });
 $('signout').onclick = async () => {
-  await client?.auth.signOut();
-  showSignedOut();
-};
-$('auth-retry').onclick = restoreSession;
-async function restoreSession() {
-  $('auth-retry').disabled = true;
-  $('auth-error').hidden = true;
+  cancelAccountLoad();
+  await pushPrompt.detach().catch(() => {});
   try {
-    const { data, error } = await client.auth.getSession();
-    if (error) throw error;
-    if (data?.session) { showSignedIn(); await loadData(); restoreSpot(); }
-    else showSignedOut();
-  } catch {
-    $('auth').hidden = false;
-    $('app').hidden = true;
-    $('navigation').hidden = true;
-    $('auth-form').hidden = true;
-    $('auth-retry').hidden = false;
-    $('auth-error').textContent = 'Could not check your session. Try again.';
-    $('auth-error').hidden = false;
-  } finally {
-    $('auth-retry').disabled = false;
+    const result = await client?.auth.signOut();
+    if (result?.error) throw result.error;
   }
+  catch { notice('Could not sign out. Reconnect and try again.'); return; }
+  showSignedOut();
+  $('data-status').hidden = true;
+};
+async function restoreSession() {
+  return loadData();
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) { loadData(); checkForNewVersion(); } });
 updateNetwork();

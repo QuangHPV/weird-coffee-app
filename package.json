@@ -4,15 +4,17 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test tests/backlog-model.test.js",
+    "test": "node --test tests/*.test.js",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build --base=./ --outDir docs",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@neondatabase/neon-js": "0.7.0-beta"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "vite": "^7.0.0"
   }
 }
