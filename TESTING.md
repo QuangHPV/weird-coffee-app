@@ -26,7 +26,7 @@ still enforced by Neon; no policies, grants or production schema were relaxed.
 ## Automated checks
 
 - `npm test`: 18 tests for backlog helpers and loading orchestration.
-- `npm run test:browser`: 35 mobile Chrome tests. The API and permission responses
+- `npm run test:browser`: 39 mobile Chrome tests. The API and permission responses
   are intercepted locally; this suite cannot create production accounts or data.
 - `npm run build` and `git diff --check`.
 
@@ -142,3 +142,19 @@ confirmed remotely before updating the local cache, phone choices are pulled
 every 30 seconds, and the desktop data fingerprint includes archive IDs. Tests
 cover read/write failures, preserving unrelated choices, fingerprint changes,
 and ensuring catalog publication does not replace owner archives.
+
+## Latest backlog UI changes
+
+The existing Manrope body and Bricolage Grotesque heading fonts now use weights
+500 and 750 respectively. Archive/restore icons appear for admin and member
+accounts in Browse and Wish list cards. New browser checks exercise successful
+archive and restore for both roles.
+
+Activity receives public scan metadata, progress, errors and batch totals. It
+shows quiet/failed scans, an Important scans only filter, detailed listing counts
+and links, and expandable checks derived from each account's current archive.
+Owner archive flags are excluded from the shared publication. Activity-only
+updates preserve catalog beans and replacement suggestions; that SQL was also
+verified on the isolated branch. Three Python checks cover publication metadata,
+progress, privacy and update deduplication. Light/dark 320px Activity layouts
+and heavier-font narrow cards were checked.

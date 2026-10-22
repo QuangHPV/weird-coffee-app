@@ -667,8 +667,13 @@ function beanCard(bean) {
     saveRanking(saved ? ranking.ids.filter(id => id !== bean.id) : [...ranking.ids, bean.id]);
   };
   top.append(titleBox, heart);
-  if (profile?.role === 'member') {
-    const archive = node('button', 'archive-action', bean.archived ? 'Restore' : 'Archive');
+  {
+    const archive = node('button', 'archive-action');
+    const box = '<rect width="20" height="5" x="2" y="3" rx="1"/>';
+    const icon = bean.archived
+      ? '<path d="M4 8v11a2 2 0 0 0 2 2h2M20 8v11a2 2 0 0 1-2 2h-2m-7-6 3-3 3 3m-3-3v9"/>'
+      : '<path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8m-10 4h4"/>';
+    archive.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${box}${icon}</svg>`;
     archive.type = 'button';
     archive.setAttribute('aria-label', `${bean.archived ? 'Restore' : 'Archive'}: ${bean.title}`);
     archive.disabled = !navigator.onLine || savingArchive;
@@ -1095,31 +1100,106 @@ async function saveRanking(ids) {
   }
 }
 
+const importantScans = $('important-scans');
+importantScans.checked = localStorage.getItem('mobileImportantScans') !== 'false';
+importantScans.onchange = () => {
+  localStorage.setItem('mobileImportantScans', String(importantScans.checked));
+  renderActivity();
+};
+function activityTime(value) {
+  const parsed = new Date(value);
+  return value && !Number.isNaN(parsed.valueOf())
+    ? parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Time unavailable';
+}
+function activityStages(run) {
+  const total = run.roasters_total || 0, done = run.roasters_done || 0;
+  const scraping = run.scrape_status === 'running' ? `Scraping ${done} of ${total || '?'} roasters${run.current_roaster ? ` — ${run.current_roaster}` : ''}`
+    : run.scrape_status === 'success' ? `Scraping successful — ${done} roasters`
+    : run.scrape_status === 'partial' ? `Scraping partially completed — ${run.roasters_failed} of ${total} roasters failed`
+    : run.scrape_status === 'failed' ? 'Scraping failed' : 'Scraping waiting';
+  const provider = run.provider === 'claude' ? 'Claude' : run.provider === 'codex' ? 'Codex' : 'the model';
+  const listings = count => `${count || 0} listing${count === 1 ? '' : 's'}`;
+  const processing = run.label_status === 'running'
+    ? run.selected_count ? `Processing ${run.labeled_count || 0} of ${listings(run.selected_count)} with ${provider}${run.batch_index ? ` — batch ${run.batch_index} of ${run.batch_total}` : ''}` : 'Preparing listings for processing'
+    : run.label_status === 'success' ? `Processing successful — ${listings(run.labeled_count)} labeled by ${provider} — ${run.model_batches || 0} model ${run.model_batches === 1 ? 'batch' : 'batches'}`
+    : run.label_status === 'skipped' ? run.scrape_status === 'failed' ? 'Processing skipped because scraping failed' : 'Processing skipped — no listings needed labels'
+    : run.label_status === 'partial' ? `Processing partially completed — ${run.labeled_count || 0} of ${listings(run.selected_count)} labeled by ${provider}`
+    : run.label_status === 'failed' ? `Processing failed — ${listings(run.labeled_count)} labeled by ${provider}` : 'Processing waiting';
+  return [scraping, processing];
+}
 function renderActivity() {
   if (!snapshot) return;
-  $('activity-intro').textContent = 'New beans, sold out listings, and restocks from your roasters.';
-  const runs = snapshot.runs.filter(run =>
-    (run.events || []).some(event => event.event !== 'archived_checked' && profile.roasters.includes(event.roaster)));
+  const all = snapshot.runs || [];
+  const latest = all[0];
+  const current = all.find(run => run.status === 'running');
+  $('activity-intro').textContent = current ? `Refresh in progress — started ${activityTime(current.started_at)}`
+    : latest ? `Last refresh — ${activityTime(latest.finished_at || latest.started_at)}` : 'No refreshes yet.';
+  const activity = snapshot.activity;
+  $('activity-totals').textContent = activity?.tracked_since
+    ? `${activity.total_model_batches} model batch ${activity.total_model_batches === 1 ? 'attempt' : 'attempts'} across refreshes — tracked since ${activityTime(activity.tracked_since)}` : '';
+  const selected = event => profile.roasters.includes(event.roaster);
+  const changesOf = run => (run.events || []).filter(event => event.event !== 'archived_checked' && selected(event));
+  const important = run => changesOf(run).length || run.labeled_count > 0
+    || ['running', 'partial', 'failed', 'interrupted'].includes(run.status)
+    || run.scrape_error || run.label_error || run.error;
+  const runs = all.filter((run, index) => !importantScans.checked || index === 0 || important(run));
+  const beans = new Map(snapshot.beans.map(bean => [bean.id, bean]));
   const sections = runs.map(run => {
     const section = node('article', 'run');
+    section.dataset.runId = run.id;
     const head = node('div', 'run-head');
-    head.append(node('time', '', date(run.finished_at || run.started_at)));
+    const timing = node('div');
+    timing.append(node('time', '', activityTime(run.started_at || run.finished_at)),
+      node('small', 'run-source', run.legacy ? 'Earlier scan — processing count unavailable'
+        : run.source === 'manual' ? 'Manual refresh' : run.source === 'recovery' ? 'Recovery refresh' : 'Daily refresh'));
+    const pills = node('div', 'run-pills');
+    if (run === latest && !current) pills.append(node('span', 'pill', 'Latest'));
+    const changes = changesOf(run);
+    if (run.labeled_count >= 30 || changes.length >= 30) pills.append(node('span', 'pill', 'Large refresh'));
+    const status = { success: 'Completed', partial: 'Partial', failed: 'Failed', interrupted: 'Interrupted', running: 'In progress' }[run.status];
+    if (status) pills.append(node('span', `pill${['partial', 'failed', 'interrupted'].includes(run.status) ? ' out' : ''}`, status));
+    head.append(timing, pills);
     section.append(head);
-    const events = run.events || [];
-    const changes = events.filter(event => event.event !== 'archived_checked' && profile.roasters.includes(event.roaster));
-    section.append(node('p', '', `${changes.length} coffee ${changes.length === 1 ? 'change' : 'changes'}`));
+    if (!run.legacy && run.scrape_status) {
+      for (const line of activityStages(run)) section.append(node('p', 'run-stage', line));
+    }
+    const error = [run.scrape_error, run.label_error, run.error].filter(Boolean).join('\n');
+    if (error) section.append(node('p', 'run-error', error));
+    const counts = node('div', 'run-counts');
+    for (const kind of ['new', 'sold_out', 'gone', 'restocked']) {
+      const count = changes.filter(event => event.event === kind).length;
+      if (count) counts.append(node('span', 'pill', `${count} ${kind.replaceAll('_', ' ')}`));
+    }
+    if (!changes.length) counts.append(node('p', '', 'No listing changes recorded from your roasters'));
+    section.append(counts);
     if (changes.length) {
       const list = node('ul');
       for (const event of changes) {
-        const line = node('li', '', `${event.event.replaceAll('_', ' ')} · ${event.roaster} · ${event.title}`);
+        const line = node('li');
+        const text = `${event.event.replaceAll('_', ' ')} · ${event.roaster} · ${event.title}`;
+        line.append(safeLink(event.url, text) || node('span', '', text));
+        if (archiveIds.has(event.bean_id)) line.append(node('span', 'pill run-archived', 'Archived'));
         list.append(line);
       }
       section.append(list);
     }
+    const checked = (run.checked_ids || []).filter(id => archiveIds.has(id) && beans.has(id) && selected(beans.get(id)));
+    if (checked.length) {
+      const details = node('details', 'run-archives');
+      details.append(node('summary', '', `${checked.length} archived ${checked.length === 1 ? 'bean' : 'beans'} checked`));
+      const list = node('ul');
+      for (const id of checked) {
+        const bean = beans.get(id), row = node('li');
+        row.append(safeLink(bean.url, `${bean.roaster} · ${bean.title}`) || node('span', '', bean.title));
+        list.append(row);
+      }
+      details.append(list);
+      section.append(details);
+    }
     return section;
   });
   $('activity-list').replaceChildren(...sections);
-  if (!runs.length) $('activity-list').append(node('div', 'empty-state', 'No coffee changes from your roasters yet.'));
+  if (!all.length) $('activity-list').append(node('div', 'empty-state', 'No refreshes yet.'));
 }
 
 function render() { renderReplacements(); renderBrowse(); renderWishlist(); renderActivity(); }
