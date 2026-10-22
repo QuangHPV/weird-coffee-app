@@ -4,8 +4,8 @@ export async function appFixture(page, options = {}) {
   const user = { id: 'test-member', name: 'Test member', email: 'test@example.invalid' };
   const profile = { user_id: user.id, role: 'member', display_name: user.name, setup_complete: true, tour_complete: true, roasters: ['Test Roaster'], filter_revision: 1, filter_state: {} };
   const beans = Array.from({ length: 20 }, (_, i) => ({ id: `bean-${i}`, roaster: 'Test Roaster', title: `Coffee ${i + 1}`, available: true, price: 20, grams: 250, per100g: 8, url: 'https://shop.example.invalid/coffee', label: { origins: ['Ethiopia'], process: ['Washed'], roast: 'light' } }));
-  const state = { signedIn: true, calls: {}, errors: [], ranking: { ids: [], revision: 1 }, archives: [], runs: [], activity: null, profile, beans, intercept: null, ...options };
-  const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': 'http://127.0.0.1:5175', 'access-control-allow-credentials': 'true', 'access-control-expose-headers': 'set-auth-jwt' } });
+  const state = { signedIn: true, calls: {}, errors: [], publishedAt: '2026-10-22T00:00:00Z', ranking: { ids: [], revision: 1 }, archives: [], runs: [], activity: null, profile, beans, intercept: null, ...options };
+  const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': route.request().headers().origin || 'http://127.0.0.1:5175', 'access-control-allow-credentials': 'true', 'access-control-expose-headers': 'set-auth-jwt' } });
   const jwt = () => `${btoa('{}')}.${btoa(JSON.stringify({ sub: state.profile.user_id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 900, version: state.calls.token || 0 }))}.test`;
   page.on('pageerror', error => state.errors.push(error.message));
   page.on('console', message => { if (message.type() === 'warning' && message.text().includes('account load')) state.errors.push(message.text()); });
@@ -29,7 +29,7 @@ export async function appFixture(page, options = {}) {
     const body = route.request().postDataJSON();
     switch (operation) {
       case 'bootstrap_account': return json(route, state.profile);
-      case 'app_snapshot': return json(route, [{ payload: { beans: state.beans, runs: state.runs, activity: state.activity, suggestions: [] }, published_at: '2026-10-22T00:00:00Z' }]);
+      case 'app_snapshot': return json(route, [{ ...(new URL(route.request().url()).searchParams.get('select')?.includes('payload') ? { payload: { beans: state.beans, runs: state.runs, activity: state.activity, suggestions: [] } } : {}), published_at: state.publishedAt }]);
       case 'wishlist_state': return json(route, [state.ranking]);
       case 'personal_archives': return json(route, state.archives.map(bean_id => ({ bean_id })));
       case 'set_personal_archive': state.archives = body.do_archive ? [...new Set([...state.archives, body.listing])] : state.archives.filter(id => id !== body.listing); return json(route, null);
@@ -41,8 +41,8 @@ export async function appFixture(page, options = {}) {
       default: return json(route, null);
     }
   });
-  state.open = async () => {
-    await page.goto('/');
+  state.open = async (url = '/') => {
+    await page.goto(url);
     if (await page.locator('#introSkip').isVisible()) await page.locator('#introSkip').click();
     await expect(page.locator('#startupIntro')).toHaveCount(0);
   };

@@ -220,5 +220,14 @@ export function mountBacklog(root, adapter) {
     if (event.target.classList.contains('backlog-edit')) saveEdit(); else add();
   });
 
-  return { reload, refresh };
+  return { reload, refresh, busy: () => busy,
+    saveDraft: () => ({ tab, draft, editing, editDraft }),
+    restoreDraft(saved) {
+      tab = saved.tab === 'completed' ? 'completed' : 'todo';
+      draft = String(saved.draft || '').slice(0, 2000);
+      editing = typeof saved.editing === 'string' ? saved.editing : null;
+      editDraft = String(saved.editDraft || '').slice(0, 2000);
+      if (state) render();
+    }
+  };
 }

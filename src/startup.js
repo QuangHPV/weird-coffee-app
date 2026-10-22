@@ -1,6 +1,7 @@
 const intro = document.getElementById('startupIntro');
 
-if (intro) {
+if (intro && document.documentElement.classList.contains('warm-entry')) intro.remove();
+else if (intro) {
   let finished = false;
   const skip = intro.querySelector('#introSkip');
   const onKeydown = event => {

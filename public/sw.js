@@ -1,89 +1,110 @@
-const CACHE = 'another-cup-shell-v3-' + (new URL(self.location.href).searchParams.get('build') || 'development');
-const SHELL = ['./', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
-  './fonts/bricolage-latin-ext.woff2',
-  './fonts/bricolage-latin.woff2',
-  './fonts/bricolage-vietnamese.woff2',
-  './fonts/bricolage.css',
-  './fonts/manrope-cyrillic-ext.woff2',
-  './fonts/manrope-cyrillic.woff2',
-  './fonts/manrope-greek.woff2',
-  './fonts/manrope-latin-ext.woff2',
-  './fonts/manrope-latin.woff2',
-  './fonts/manrope-vietnamese.woff2',
-  './fonts/manrope.css'];
-const timedFetch = request => fetch(request, { signal: AbortSignal.timeout(6000) });
-function entryAssets(html, url) {
-  return [...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css)(?:\?[^"']*)?)["']/g)]
-    .map(match => new URL(match[1], url))
-    .filter(asset => asset.origin === self.location.origin && asset.href.startsWith(self.registration.scope));
-}
-async function cachePage(cache, request, response) {
-  // Commit HTML only after its entry files are cached. A failed deployment or
-  // connection must not leave an offline page pointing at missing bundles.
-  const assets = entryAssets(await response.clone().text(), response.url || new URL(request, self.registration.scope).href);
-  await Promise.all(assets.map(async asset => {
-    if (await cache.match(asset.href)) return;
-    const fetched = await timedFetch(asset.href);
-    if (!fetched.ok) throw new Error('Entry asset unavailable');
-    await cache.put(asset.href, fetched);
-  }));
-  await cache.put(request, response);
+const RELEASE = /*BUILD_RELEASE*/ null;
+const PREFIX = 'another-cup-shell-';
+const CACHE = PREFIX + 'v4-' + (RELEASE?.id || 'development');
+const scope = self.registration.scope;
+const urlOf = path => new URL(path, scope).href;
+const COMPLETE = urlOf('__complete__');
+const META = 'another-cup-client-releases';
+const timedFetch = request => fetch(request, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+const tellClients = async type => {
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of windows) if (client.url.startsWith(scope)) client.postMessage({ type, release: RELEASE?.id });
+};
+async function verify(response, asset) {
+  if (!response.ok || response.type === 'opaque') throw new Error('Incomplete release');
+  if (asset.sha256) {
+    const hash = await crypto.subtle.digest('SHA-256', await response.clone().arrayBuffer());
+    const actual = [...new Uint8Array(hash)].map(value => value.toString(16).padStart(2, '0')).join('');
+    if (actual !== asset.sha256) throw new Error('Release asset mismatch');
+  }
 }
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await Promise.all(SHELL.slice(1).map(async path => {
-      const url = new URL(path, self.registration.scope).href;
-      const response = await timedFetch(url);
-      if (!response.ok) throw new Error('App shell unavailable');
-      await cache.put(url, response);
-    }));
-    const url = self.registration.scope;
-    const response = await timedFetch(url);
-    if (!response.ok) throw new Error('App page unavailable');
-    await cachePage(cache, url, response);
-    await self.skipWaiting();
+    try {
+      const assets = RELEASE?.assets || [{ url: 'index.html' }];
+      // A bounded queue avoids opening dozens of simultaneous font connections.
+      let index = 0;
+      await Promise.all(Array.from({ length: Math.min(4, assets.length) }, async () => {
+        while (index < assets.length) {
+          const asset = assets[index++], url = urlOf(asset.url);
+          const response = await timedFetch(url);
+          await verify(response, asset);
+          await cache.put(url, response);
+        }
+      }));
+      await cache.put(COMPLETE, new Response('ready'));
+      await tellClients('RELEASE_READY');
+    } catch (error) { await caches.delete(CACHE); throw error; }
+    // Updated workers wait for a safe, coordinated handover from the page.
   })());
 });
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('another-cup-shell-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(self.clients.claim().then(() => tellClients('RELEASE_ACTIVE')));
+});
+async function rememberClient(event) {
+  if (!event.source?.id || !event.source.url.startsWith(scope)) return;
+  const meta = await caches.open(META);
+  await meta.put(urlOf('__client__/' + event.source.id), new Response(event.data.release));
+  const clients = (await self.clients.matchAll({ type: 'window', includeUncontrolled: true })).filter(client => client.url.startsWith(scope));
+  const live = new Set();
+  for (const client of clients) {
+    const response = await meta.match(urlOf('__client__/' + client.id));
+    // An old client has not identified its release yet: retain all old caches.
+    if (!response) return;
+    live.add(await response.text());
+  }
+  const keys = (await caches.keys()).filter(key => key.startsWith(PREFIX));
+  const retained = new Set([CACHE, ...keys.slice(-3)]);
+  for (const key of keys) if (!retained.has(key) && ![...live].some(id => key === PREFIX + 'v4-' + id)) await caches.delete(key);
+  const liveIds = new Set(clients.map(client => urlOf('__client__/' + client.id)));
+  for (const request of await meta.keys()) if (!liveIds.has(request.url)) await meta.delete(request);
+}
+self.addEventListener('message', event => {
+  if (event.data?.type === 'RELEASE_STATUS') event.ports[0]?.postMessage({ id: RELEASE?.id, ready: true });
+  if (event.data?.type === 'ACTIVATE_RELEASE' && event.data.release === RELEASE?.id) event.waitUntil(self.skipWaiting());
+  if (event.data?.type === 'CLIENT_RELEASE' && typeof event.data.release === 'string') event.waitUntil(rememberClient(event));
 });
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || !url.href.startsWith(scope)) return;
+  // Release discovery must always observe the server, never a cached manifest.
+  if (url.pathname === new URL('release.json', scope).pathname) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    try {
-      const response = await timedFetch(event.request);
-      if (response.ok) {
-        const copy = response.clone();
-        const write = response.headers.get('content-type')?.includes('text/html')
-          ? cachePage(cache, event.request, copy) : cache.put(event.request, copy);
-        event.waitUntil(write.catch(() => {}));
-      }
-      if (!response.ok && event.request.mode === 'navigate') {
-        const cached = await cache.match(event.request) || await cache.match(self.registration.scope);
-        if (cached) return cached;
-      }
-      return response;
-    } catch {
-      return await cache.match(event.request)
-        || (event.request.mode === 'navigate' ? await cache.match(self.registration.scope) : null)
-        || Response.error();
+    const navigation = event.request.mode === 'navigate';
+    const key = navigation ? urlOf('index.html') : event.request;
+    const cached = await cache.match(key);
+    if (cached) return cached;
+    // Old pages can still request their old hashed assets after activation.
+    if (!navigation) for (const name of (await caches.keys()).filter(name => name.startsWith(PREFIX) && name !== CACHE)) {
+      const previous = await (await caches.open(name)).match(key);
+      if (previous) return previous;
     }
+    // Never replace a verified shell with runtime HTML from another release.
+    return timedFetch(event.request).catch(() => Response.error());
   })());
 });
 
-// A push from the Mac: show it, and open the app when it is tapped.
 self.addEventListener('push', event => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data.text() }; }
-  event.waitUntil(self.registration.showNotification(data.title || 'Another Cup', {
-    body: data.body || '', icon: './icon-192.png', badge: './icon-192.png', data: { url: data.url || './' } }));
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data?.text() || '' }; }
+  event.waitUntil(Promise.all([
+    tellClients('DATA_CHANGED'),
+    self.registration.showNotification(data.title || 'Another Cup', {
+      body: data.body || '', icon: './icon-192.png', badge: './icon-192.png', data: { url: data.url || './' }
+    })
+  ]));
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
-    for (const client of windows) if ('focus' in client) return client.focus();
-    return self.clients.openWindow(event.notification.data.url);
-  }));
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) if (client.url.startsWith(scope) && 'focus' in client) {
+      client.postMessage({ type: 'DATA_CHANGED' });
+      return client.focus();
+    }
+    const destination = new URL(event.notification.data.url, scope);
+    return self.clients.openWindow(destination.href.startsWith(scope) ? destination.href : scope);
+  })());
 });

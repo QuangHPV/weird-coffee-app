@@ -51,15 +51,18 @@ try {
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await expect.poll(() => page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
-      return registration?.active?.scriptURL.includes('build=');
+      return registration?.active?.scriptURL.endsWith('/sw.js');
     })).toBe(true);
     console.log('REAL PWA: signed in, catalog loaded, service worker active');
+    const cachedContentMs = [];
     for (let i = 0; i < 10; i++) {
       await page.reload();
       if (await page.locator('#introSkip').isVisible()) await page.locator('#introSkip').click();
       await ready();
+      const timing = await page.evaluate(() => performance.getEntriesByName('app:cached-content')[0]?.startTime);
+      expect(timing).toBeGreaterThan(0); cachedContentMs.push(Math.round(timing));
     }
-    console.log('REAL RELOADS: 10 passed');
+    console.log('REAL RELOADS: 10 passed; cached content ms:', JSON.stringify(cachedContentMs));
     for (let i = 0; i < 5; i++) {
       const response = page.waitForResponse(response => response.url().includes('/app_snapshot'));
       await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
@@ -73,7 +76,8 @@ try {
     await page.reload();
     if (await page.locator('#introSkip').isVisible()) await page.locator('#introSkip').click();
     await expect(page.locator('#data-status')).toContainText('Offline');
-    console.log('REAL OFFLINE RELOAD: entry bundles available, app booted without network');
+    await expect(page.locator('#bean-list .bean-card').first()).toBeVisible();
+    console.log('REAL OFFLINE RELOAD: styled shell and cached account content available');
     await context.setOffline(false);
     await ready();
     console.log('REAL RECONNECT: recovered automatically');

@@ -1,7 +1,19 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <meta name="app-release" content="980b402ef3973eb8faa5">
   <meta charset="utf-8">
+  <style>
+    html{background:#f7f3ed;color:#292019;font-family:system-ui,sans-serif}body{margin:0}button,input,textarea{font:inherit}[hidden]{display:none!important}
+    @media(prefers-color-scheme:dark){html{background:#17120f;color:#eee4d9}}
+    .warm-entry #startupIntro{display:none!important}
+  </style>
+  <script>
+    try {
+      if (sessionStorage.getItem('anotherCupEntered') || navigator.serviceWorker?.controller) document.documentElement.classList.add('warm-entry');
+      sessionStorage.setItem('anotherCupEntered', '1');
+    } catch {}
+  </script>
   <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f7f3ed" media="(prefers-color-scheme: light)">
@@ -25,7 +37,7 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-d6lNUuPa.js"></script>
+  <script type="module" crossorigin src="./assets/index-DXsqOntG.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-DFxxJJkI.css">
 </head>
 <body>

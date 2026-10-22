@@ -3,8 +3,10 @@ import { createDataLoader, LoadError, readResult } from './data-loader.js';
 import './startup.js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
-import { reloadWhenIdle, saveSpot, takeSpot } from './live-update.js';
+import { typing, restoreDrafts, saveSpot, takeSpot } from './live-update.js';
 import { mountPushPrompt } from './push.js';
+import { startReleaseUpdates } from './release-updates.js';
+import { createAccountCache } from './account-cache.js';
 
 const $ = id => document.getElementById(id);
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
@@ -12,6 +14,8 @@ const demoMember = demoMode && new URLSearchParams(location.search).get('demo') 
 const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
 const dataApiUrl = import.meta.env.VITE_NEON_DATA_API_URL;
 const client = authUrl && dataApiUrl ? createAccountClient(authUrl, dataApiUrl) : null;
+const accountCache = createAccountCache(dataApiUrl || 'unconfigured');
+let accountEpoch = 0, lastBundle = null, restoredAccount = null, forceAccountSession = true;
 let accountLoadStatus = 'idle';
 let snapshot = null;
 let ranking = null;
@@ -151,24 +155,27 @@ function updateNetwork() {
   renderBrowse();
   renderWishlist();
 }
-window.addEventListener('online', () => { updateNetwork(); loadData(); });
+window.addEventListener('online', () => { forceAccountSession = true; updateNetwork(); loadData(); });
 window.addEventListener('offline', updateNetwork);
 
-function showSignedOut({ cancelLoad = true } = {}) {
-  if (cancelLoad) cancelAccountLoad();
+function showSignedOut({ cancelLoad = true, clearCache = true } = {}) {
+  if (cancelLoad) cancelAccountLoad({ invalidate: clearCache });
+  accountEpoch++;
+  if (clearCache) accountCache.clear();
+  lastBundle = restoredAccount = null;
   pushPrompt.reset();
   client?.clear();
   accountLoadStatus = 'signed-out';
   snapshot = null;
   ranking = null;
   profile = null;
+  delete document.documentElement.dataset.accountUserId;
   archiveIds = new Set();
   showingSetup = false;
   tourStep = 0;
   renderTour();
   requests = [];
   decisions = [];
-  loadedSignature = '';
   $('auth').hidden = false;
   $('app').hidden = true;
   $('navigation').hidden = true;
@@ -184,7 +191,10 @@ function showSignedIn() {
 }
 
 async function accountSession() {
-  return client.accountSession();
+  const userId = await client.accountSession({ force: forceAccountSession });
+  forceAccountSession = false;
+  accountCache.confirm(userId, client.sessionExpiresAt());
+  return userId;
 }
 
 function setLoadState({ status, quiet = false, expired = false }) {
@@ -214,17 +224,24 @@ const accountLoader = createDataLoader({
     const userId = await accountSession();
     if (signal.aborted) throw signal.reason;
     if (profile && profile.user_id !== userId) {
-      showSignedOut({ cancelLoad: false });
+      showSignedOut({ cancelLoad: false, clearCache: false });
       // Re-establish the new session after clearing the old account's state.
       await accountSession();
       $('auth').hidden = true;
       setLoadState({ status: 'loading' });
     }
+    if (!snapshot && restoredAccount !== userId) {
+      const epoch = accountEpoch;
+      const cached = await accountCache.read(userId);
+      if (signal.aborted || epoch !== accountEpoch) throw signal.reason || new Error('Account changed');
+      restoredAccount = userId;
+      if (cached) { applyAccountBundle(cached, { cached: true }); setLoadState({ status: 'loading' }); }
+    }
     const api = await client.forAccount(userId);
     const initial = profile?.user_id === userId ? profile : readResult('account setup', await api.rpc('bootstrap_account').abortSignal(signal));
     const initialized = Array.isArray(initial) ? initial[0] : initial;
     const specs = [
-      ['catalog', api.from('app_snapshot').select('payload,published_at').eq('id', 1)],
+      ['catalog', api.from('app_snapshot').select(lastBundle ? 'published_at' : 'payload,published_at').eq('id', 1)],
       ['wish list', api.from('wishlist_state').select('ids,revision,updated_at')],
       ['archives', api.from('personal_archives').select('bean_id')],
       ['profile', api.from('app_users').select('user_id,role,display_name,roasters,setup_complete,filter_state,filter_revision,tour_complete')]
@@ -235,6 +252,14 @@ const accountLoader = createDataLoader({
     if (!catalog?.length || !wish?.length || !profiles?.length || profiles[0].user_id !== userId) {
       throw new LoadError('account data', { code: 'DATA_NOT_READY', message: 'Account data is not ready' });
     }
+    if (lastBundle) {
+      if (catalog[0].published_at === lastBundle.catalog.published_at) catalog[0].payload = lastBundle.catalog.payload;
+      else {
+        const changed = readResult('catalog', await api.from('app_snapshot').select('payload,published_at').eq('id', 1).abortSignal(signal));
+        if (!changed?.length) throw new LoadError('catalog', { code: 'DATA_NOT_READY' });
+        catalog[0] = changed[0];
+      }
+    }
     const payload = catalog[0].payload;
     if (!Array.isArray(payload?.beans) || !Array.isArray(payload?.runs) || !Array.isArray(wish[0].ids)) {
       throw new LoadError('data format', { code: 'INVALID_DATA' });
@@ -243,38 +268,56 @@ const accountLoader = createDataLoader({
     return { catalog: catalog[0], wish: wish[0], archives, profile: { ...initialized, ...profiles[0] },
       decisions: choices.error ? decisions : choices.data };
   },
-  apply(bundle) {
-    const nextProfile = bundle.profile;
-    const signature = `${nextProfile.user_id}|${bundle.catalog.published_at}|${bundle.wish.revision}|${bundle.archives.map(row => row.bean_id).sort().join(',')}|${nextProfile.filter_revision}|${nextProfile.tour_complete}|${JSON.stringify(bundle.decisions)}`;
-    profile = nextProfile;
-    showSignedIn();
-    if (signature === loadedSignature) { if (view === 'backlog') refreshBacklogView(); pushPrompt.update(profile); return; }
-    loadedSignature = signature;
-    decisions = bundle.decisions;
-    ranking = bundle.wish;
-    archiveIds = new Set(bundle.archives.map(row => row.bean_id));
-    snapshot = { ...bundle.catalog.payload, beans: bundle.catalog.payload.beans.map(bean => ({ ...bean, archived: archiveIds.has(bean.id) })) };
-    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
-    $('published').textContent = `Updated ${date(bundle.catalog.published_at)}`;
-    showingSetup = !profile.setup_complete;
-    renderSetup(); buildFilters(); render();
-    if (profile.role === 'member' && profile.setup_complete && !profile.tour_complete && !tourStep) startTour();
-    else renderTour();
-    if (view === 'backlog') refreshBacklogView();
-    restoreSpot();
-    pushPrompt.update(profile);
-  },
+  apply: bundle => applyAccountBundle(bundle),
   refreshSession: () => client.refreshSession(),
   state: setLoadState
 });
-function cancelAccountLoad() {
+function applyAccountBundle(bundle, { cached = false } = {}) {
+  const previous = lastBundle;
+  const nextProfile = bundle.profile;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const filtersChanged = !previous || !same(profile, nextProfile);
+  const beansChanged = !previous || !same(previous.catalog.payload.beans, bundle.catalog.payload.beans);
+  const personalChanged = !previous || !same(ranking, bundle.wish) || !same([...archiveIds].sort(), bundle.archives.map(row => row.bean_id).sort());
+  const suggestionsChanged = !previous || !same(previous.catalog.payload.suggestions, bundle.catalog.payload.suggestions) || !same(decisions, bundle.decisions);
+  const activityChanged = !previous || !same(previous.catalog.payload.runs, bundle.catalog.payload.runs) || !same(previous.catalog.payload.activity, bundle.catalog.payload.activity);
+  profile = nextProfile;
+  document.documentElement.dataset.accountUserId = profile.user_id;
+  decisions = bundle.decisions;
+  ranking = bundle.wish;
+  archiveIds = new Set(bundle.archives.map(row => row.bean_id));
+  snapshot = { ...bundle.catalog.payload, beans: bundle.catalog.payload.beans.map(bean => ({ ...bean, archived: archiveIds.has(bean.id) })) };
+  lastBundle = bundle;
+  showSignedIn();
+  $('published').textContent = `Updated ${date(bundle.catalog.published_at)}${cached ? navigator.onLine ? ' · Checking…' : ' · Saved copy' : ''}`;
+  showingSetup = !profile.setup_complete;
+  if (filtersChanged || beansChanged) {
+    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
+    renderSetup(); buildFilters();
+  }
+  if (filtersChanged || beansChanged || personalChanged || suggestionsChanged) { renderReplacements(); renderBrowse(); renderWishlist(); }
+  if (filtersChanged || beansChanged || personalChanged || activityChanged) renderActivity();
+  if (!cached) {
+    if (profile.role === 'member' && profile.setup_complete && !profile.tour_complete && !tourStep) startTour();
+    else renderTour();
+    if (view === 'backlog') refreshBacklogView();
+    pushPrompt.update(profile);
+    accountCache.write(bundle);
+    performance.clearMarks('app:data-fresh');
+    performance.mark('app:data-fresh');
+  } else performance.mark('app:cached-content');
+  restoreSpot();
+  restoreDrafts(profile.user_id);
+}
+function cancelAccountLoad({ invalidate = true } = {}) {
   accountLoader.reset();
+  accountEpoch++;
+  if (invalidate) accountCache.invalidate();
   $('app').setAttribute('aria-busy', 'false');
 }
 $('data-retry').onclick = () => loadData();
 
-// `quiet` is the background check: it redraws only when the published data or the Wish list changed.
-let loadedSignature = '';
+// Background reads leave unchanged UI nodes attached.
 async function loadData({ quiet = false } = {}) {
   if (demoMode) {
     snapshot = demoSnapshot;
@@ -291,6 +334,13 @@ async function loadData({ quiet = false } = {}) {
     return;
   }
   if (snapshot && (saving || savingFilters || savingArchive || deciding || activeWishDrag || pendingWishDrag || document.body.classList.contains('filters-open'))) return false;
+  if (client && !navigator.onLine && !snapshot) {
+    const identity = accountCache.identity(), epoch = accountEpoch;
+    if (identity?.expiresAt > Date.now()) {
+      const cached = await accountCache.read(identity.userId);
+      if (cached && epoch === accountEpoch && !navigator.onLine) applyAccountBundle(cached, { cached: true });
+    }
+  }
   if (client) return accountLoader.load({ quiet });
 }
 
@@ -794,6 +844,17 @@ function renderReplacements() {
   box.replaceChildren(node('h3', '', `Possible replacement${pairs.length === 1 ? '' : 's'}`), ...pairs.map(replacePair));
 }
 
+const renderKeys = new WeakMap();
+function reconcile(container, children) {
+  let cursor = container.firstChild;
+  const retained = new Set(children);
+  for (const child of children) {
+    if (child === cursor) cursor = cursor.nextSibling;
+    else container.insertBefore(child, cursor);
+  }
+  for (const child of [...container.childNodes]) if (!retained.has(child)) child.remove();
+}
+
 function renderBrowse() {
   if (!snapshot) return;
   const filtered = snapshot.beans.filter(bean => matches(bean, appliedFilters));
@@ -804,7 +865,13 @@ function renderBrowse() {
     return score(a) - score(b);
   });
   $('count').textContent = `${filtered.length} ${filtered.length === 1 ? 'bean' : 'beans'}`;
-  $('bean-list').replaceChildren(...filtered.map(beanCard));
+  const existing = new Map([...$('bean-list').children].map(card => [card.dataset.beanId, card]));
+  reconcile($('bean-list'), filtered.map(bean => {
+    const key = JSON.stringify([bean, ranking?.ids.includes(bean.id), saving, savingArchive, navigator.onLine]);
+    const old = existing.get(bean.id);
+    if (old && renderKeys.get(old) === key) return old;
+    const card = beanCard(bean); renderKeys.set(card, key); return card;
+  }));
   if (!filtered.length) {
     const empty = node('div', 'empty-state');
     empty.append(node('h3', '', appliedFilters.showArchived ? 'Nothing archived yet' : 'No beans here yet'),
@@ -829,8 +896,12 @@ function renderWishlist() {
   $('wish-in-stock').checked = wishInStockOnly;
   const hidden = ranking.ids.length - wishShown.length;
   $('wish-hidden').textContent = hidden ? `${hidden} hidden` : '';
+  const existing = new Map([...$('wish-list').children].map(item => [item.dataset.id, item]));
   const items = wishShown.map((id, index) => {
     const bean = byId.get(id);
+    const key = JSON.stringify([bean, index, wishShown.length, saving, savingArchive, navigator.onLine, pendingReplacements()]);
+    const old = existing.get(id);
+    if (old && renderKeys.get(old) === key) return old;
     const item = node('li', `wish-item${bean && (!bean.available || bean.gone) ? ' out' : ''}`);
     item.dataset.id = id;
     // Rank bar: position on the left, move arrows on the right. Press and hold the card to drag.
@@ -861,9 +932,10 @@ function renderWishlist() {
       missing.append(remove);
       item.append(missing);
     }
+    renderKeys.set(item, key);
     return item;
   });
-  $('wish-list').replaceChildren(...items);
+  reconcile($('wish-list'), items);
   if (!items.length) {
     const empty = node('li', 'empty-state');
     empty.append(node('h3', '', ranking.ids.length ? 'Nothing in stock right now' : 'Your Wish list is empty'),
@@ -1198,6 +1270,8 @@ function renderActivity() {
     }
     return section;
   });
+  const open = new Set([...$('activity-list').querySelectorAll('.run:has(details[open])')].map(section => section.dataset.runId));
+  for (const section of sections) if (open.has(section.dataset.runId)) section.querySelector('details')?.setAttribute('open', '');
   $('activity-list').replaceChildren(...sections);
   if (!all.length) $('activity-list').append(node('div', 'empty-state', 'No refreshes yet.'));
 }
@@ -1357,6 +1431,7 @@ $('auth-form').onsubmit = async event => {
       password: $('password').value
     });
     if (result?.error) throw result.error;
+    forceAccountSession = true;
     $('password').value = '';
     await loadData();
   } catch (error) {
@@ -1381,19 +1456,21 @@ $('signout').onclick = async () => {
 async function restoreSession() {
   return loadData();
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && accountLoadStatus !== 'signed-out') { loadData(); checkForNewVersion(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && accountLoadStatus !== 'signed-out') { forceAccountSession = true; loadData(); } });
 updateNetwork();
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  const build = new URL(import.meta.url).pathname.split('/').at(-1);
-  navigator.serviceWorker.register(`./sw.js?build=${encodeURIComponent(build)}`).catch(() => {});
-}
-
-// Live updates: check for newer data every minute while the app is open and quiet.
+// Poll small revisions, fetching the catalog body only when its publication changes.
 setInterval(() => {
-  const dragging = activeWishDrag || pendingWishDrag;
-  if (document.hidden || accountLoadStatus === 'signed-out' || saving || dragging || showingSetup || document.body.classList.contains('filters-open')) return;
+  if (document.hidden || accountLoadStatus === 'signed-out' || showingSetup) return;
   loadData({ quiet: true });
-}, 60000);
+}, 10000);
+window.addEventListener('storage', event => {
+  if (!accountCache.isIdentityEvent(event)) return;
+  const identity = accountCache.identity();
+  if (!identity || profile && identity.userId !== profile.user_id) {
+    showSignedOut({ clearCache: false });
+    if (identity) { forceAccountSession = true; loadData(); }
+  }
+});
 
 // The backlog is checked more often while it is on screen.
 setInterval(() => {
@@ -1401,67 +1478,27 @@ setInterval(() => {
   if (profile?.role === 'admin') backlog.refresh(); else refreshRequests();
 }, 15000);
 
-// New deployment: the published page points at different script or CSS files than the ones running.
-// A CSS-only change is swapped in place; a script change reloads once you are not typing.
+// Release updates stage a complete shell, then hand over once the UI is idle.
 const SPOT = 'anotherCupSpot';
 let spot = takeSpot(SPOT);
 function restoreSpot() {
   if (!spot) return;
   if (tourStep || showingSetup) { spot = null; return; }
+  if (spot.userId && spot.userId !== profile?.user_id) { spot = null; return; }
+  if (spot.backlog) backlog.restoreDraft(spot.backlog);
   if (spot.view && spot.view !== view) setView(spot.view);
   window.scrollTo(0, spot.scroll || 0);
   spot = null;
 }
-const filesOf = html => {
-  const page = new DOMParser().parseFromString(html, 'text/html');
-  return {
-    script: page.querySelector('script[type=module][src]')?.getAttribute('src') || '',
-    styles: [...page.querySelectorAll('link[rel=stylesheet]')].map(link => link.getAttribute('href')).filter(href => href.startsWith('./')),
-  };
-};
-let versionCheckedAt = 0;
-let knownScript = '', runningPrint = '';
-// The script file name changes with any CSS change too, so compare the scripts with the CSS names removed.
-// Old files disappear after a deployment, so the running script is fingerprinted once, at the first check.
-async function scriptPrint(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Version asset unavailable');
-  const text = (await response.text()).replace(/index-[\w-]{8}\.css/g, 'index.css');
-  const hash = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text));
-  return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-async function checkForNewVersion() {
-  if (!import.meta.env.PROD || !navigator.onLine || Date.now() - versionCheckedAt < 30000) return;
-  versionCheckedAt = Date.now();
-  try {
-    const response = await fetch(location.pathname, { cache: 'no-store' });
-    if (!response.ok) return;
-    const latest = filesOf(await response.text());
-    const running = filesOf(document.documentElement.outerHTML);
-    if (!knownScript) { knownScript = running.script; runningPrint = await scriptPrint(running.script); }
-    navigator.serviceWorker?.getRegistration().then(registration => registration?.update()).catch(() => {});
-    if (latest.script && latest.script !== knownScript) {
-      if (await scriptPrint(latest.script) !== runningPrint) {
-        reloadWhenIdle({ beforeReload: () => saveSpot(SPOT, { view }) });
-        return;
-      }
-      knownScript = latest.script;
-    }
-    for (const link of document.querySelectorAll('link[rel=stylesheet]')) {
-      const href = link.getAttribute('href');
-      if (!href.startsWith('./') || latest.styles.includes(href)) continue;
-      const next = latest.styles.find(value => value.replace(/-[\w-]{8}\.css$/, '') === href.replace(/-[\w-]{8}\.css$/, ''));
-      if (!next) continue;
-      const fresh = link.cloneNode();
-      fresh.href = next;
-      fresh.onload = () => link.remove();
-      link.after(fresh);
-    }
-  } catch { /* try again at the next check */ }
-}
-setInterval(() => { if (!document.hidden) checkForNewVersion(); }, 300000);
-window.addEventListener('online', checkForNewVersion);
-checkForNewVersion();
+if (import.meta.env.PROD) startReleaseUpdates({
+  release: document.querySelector('meta[name="app-release"]')?.content,
+  busy: () => typing() || backlog.busy() || saving || savingFilters || savingArchive || deciding || showingSetup || !!tourStep || !!activeWishDrag || !!pendingWishDrag || document.body.classList.contains('filters-open'),
+  beforeReload: () => {
+    if (saving || savingFilters || savingArchive || deciding || activeWishDrag || pendingWishDrag || backlog.busy() || document.body.classList.contains('filters-open')) throw new Error('Finish saving first');
+    saveSpot(SPOT, { view, userId: profile?.user_id, backlog: backlog.saveDraft() });
+  },
+  onDataChanged: () => { forceAccountSession = true; loadData({ quiet: true }); }
+});
 if (demoMode) {
   showSignedIn();
   loadData();

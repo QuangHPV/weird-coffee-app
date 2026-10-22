@@ -10,14 +10,14 @@ export function createAccountClient(authUrl, dataApiUrl) {
   const auth = createClient({ auth: { url: authUrl,
     adapter: BetterAuthVanillaAdapter({ fetchOptions: { timeout: 12000 } }) },
     dataApi: { url: dataApiUrl } }).auth;
-  let identity = null, token = null, generation = 0, pending = null;
+  let identity = null, token = null, generation = 0, pending = null, checkedAt = 0, expiresAt = 0;
   function usable(value, userId = identity) {
     try {
       const claims = JSON.parse(atob(value.split('.')[1].replaceAll('-', '+').replaceAll('_', '/')));
       return claims.sub === userId && claims.exp * 1000 > Date.now() + 30000;
     } catch { return false; }
   }
-  function clear() { generation++; identity = token = pending = null; }
+  function clear() { generation++; identity = token = pending = null; checkedAt = expiresAt = 0; }
   async function getToken(force = false) {
     if (!identity) throw new SessionEnded();
     if (!force && usable(token)) return token;
@@ -38,7 +38,9 @@ export function createAccountClient(authUrl, dataApiUrl) {
     options: { global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) } } } });
   return Object.assign(dataClient, {
     auth, clear,
-    async accountSession() {
+    sessionExpiresAt: () => expiresAt,
+    async accountSession({ force = true } = {}) {
+      if (!force && identity && usable(token) && Date.now() - checkedAt < 30000 && expiresAt > Date.now()) return identity;
       const before = generation;
       const data = readResult('session', await auth.getSession(forceFetch));
       if (before !== generation) throw new SessionEnded();
@@ -46,6 +48,8 @@ export function createAccountClient(authUrl, dataApiUrl) {
       if (identity !== data.user.id) { clear(); identity = data.user.id; }
       if (!usable(token) && usable(data.session.token)) token = data.session.token;
       await getToken();
+      checkedAt = Date.now();
+      expiresAt = Date.parse(data.session.expiresAt) || checkedAt;
       return identity;
     },
     async refreshSession() { await this.accountSession(); await getToken(true); },

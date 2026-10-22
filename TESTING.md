@@ -26,7 +26,7 @@ still enforced by Neon; no policies, grants or production schema were relaxed.
 ## Automated checks
 
 - `npm test`: 18 tests for backlog helpers and loading orchestration.
-- `npm run test:browser`: 39 mobile Chrome tests. The API and permission responses
+- `npm run test:browser`: 46 mobile Chrome tests. The API and permission responses
   are intercepted locally; this suite cannot create production accounts or data.
 - `npm run build` and `git diff --check`.
 
@@ -158,3 +158,61 @@ updates preserve catalog beans and replacement suggestions; that SQL was also
 verified on the isolated branch. Three Python checks cover publication metadata,
 progress, privacy and update deduplication. Light/dark 320px Activity layouts
 and heavier-font narrow cards were checked.
+
+
+## Fast startup and release handover (2026-10-22)
+
+The production worker was reproduced in a disposable local fixture: a warm
+reload took 12,034 ms with eight-second network responses, and HTTP 404s for
+old CSS produced an unstyled page even though that CSS existed in CacheStorage.
+The former worker tried the network for every resource and only fell back on
+thrown errors for CSS/JS. The old deployment checker also fetched its old entry
+script before it could detect a release; removal of that file broke detection.
+
+The build now generates `release.json`, embeds its ID in HTML, and inserts an
+asset manifest with SHA-256 hashes into the stable `sw.js`. Install verifies all
+required files before completing. A running app serves its matching cached shell
+and static files immediately. Updates wait for the page's activation message;
+reload occurs only after the new controller confirms the target release. Open
+clients identify their releases so cleanup retains their files. The preceding
+Git commit's entry assets and the original legacy entry files are also published
+for migration from the old checker.
+
+Visible clients check the release manifest every ten seconds and on resume or
+reconnect. Data checks also run every ten seconds, request catalog metadata first,
+and reuse the payload when its publication is unchanged. A recently verified
+session can be reused for thirty seconds; resume/reconnect force verification.
+Unchanged cards remain attached, Activity updates do not replace Browse/Wish-list
+cards, and expanded Activity details survive progress updates. Warm entries and
+automatic updates skip the opening animation.
+
+Account snapshots are display-only IndexedDB records, scoped to the Data API and
+user ID. Online startup verifies the account before showing its cache. Offline
+startup can show the last confirmed account only until that session's recorded
+expiry. Cached content carries a checking/saved-copy state; failed refreshes keep
+it visible. Storage reads are bounded, unavailable storage falls back to normal
+loading, local edits invalidate the saved snapshot, and sign-out clears it and
+hides other open tabs. JWTs, credentials and mutation queues are not persisted.
+
+`npm run test:pwa` builds with isolated fake API URLs, then uses real Chrome
+service workers and local deployment fixtures. It covers slow networks, old
+asset 404s, offline styles/fonts/data, safe activation, scroll/view restoration,
+corrupt/partial releases, ten-second detection, several releases while typing,
+drafts across explicit reload, multiple tabs, real CDP-delivered Web Push,
+first-install/registration recovery, expired offline identity and migration from
+the preceding worker. The former development-worker font test is now covered
+against production bundles in this suite. The suite has 12 cases. Warm-shell measurements on this Mac
+were 50–78 ms; these are shell timings, not physical Android content benchmarks.
+
+Additional browser checks cover cached content before delayed data, revoked and
+changed accounts, metadata-only polling, card identity/focus preservation, storage
+failure and cross-tab sign-out. The real isolated Neon account also passed ten
+reloads, five resumes, offline startup and reconnection, with no page errors.
+In the final run, cached account content appeared in 45–86 ms over ten reloads;
+all real API requests succeeded.
+Its first bootstrap again returned 403/42501; existing token recovery succeeded.
+The upstream intermittent authorization issue remains unconfirmed.
+
+Physical Android timing and visual verification are still needed. Background
+OS suspension and notification delivery can delay updates; visible polling
+latency starts when a complete release is available from hosting.

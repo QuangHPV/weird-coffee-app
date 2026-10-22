@@ -41,19 +41,49 @@ export const typing = () => !!document.activeElement?.closest?.(FIELD)
   || Date.now() - lastTyped < 20000
   || [...document.querySelectorAll('textarea')].some(box => box.value.trim());
 
-// Tell the person a new version is ready, then reload after 2 s, unless they are busy.
+// A complete release can reload immediately once editing and saves are idle.
 let waiting = false;
-export function reloadWhenIdle({ busy = typing, beforeReload = () => {} } = {}) {
+export function reloadWhenIdle({ busy = typing, beforeReload = () => {}, reload = () => location.reload(), delayMs = 2000 } = {}) {
   if (waiting) return;
   waiting = true;
-  const reload = () => { beforeReload(); location.reload(); };
-  const toast = showToast('New version ready', 'Reload now', reload);
+  let applying = false, timer;
+  const apply = async () => {
+    if (applying) return;
+    applying = true;
+    try { rememberDrafts(); await beforeReload(); await reload(); }
+    catch { applying = false; toast.set('Update is still preparing. Tap to retry.'); }
+  };
+  const toast = showToast('New version ready', 'Reload now', apply);
   const check = () => {
-    if (busy()) { toast.set('New version ready. Reloads when you stop typing.'); setTimeout(check, 1000); return; }
-    toast.set('New version ready. Reloading…');
-    setTimeout(() => (busy() ? check() : reload()), 2000);
+    clearTimeout(timer);
+    if (applying) return;
+    if (busy()) { timer = setTimeout(check, 1000); return; }
+    if (delayMs) timer = setTimeout(() => busy() ? check() : apply(), delayMs);
+    else apply();
   };
   check();
+  return { retry: check };
+}
+
+const DRAFTS = 'anotherCupReloadDrafts';
+function rememberDrafts() {
+  try {
+    const drafts = [...document.querySelectorAll('textarea[id]')].map(box => ({ id: box.id, value: box.value, start: box.selectionStart, end: box.selectionEnd }));
+    sessionStorage.setItem(DRAFTS, JSON.stringify({ userId: document.documentElement.dataset.accountUserId, drafts }));
+  } catch {}
+}
+export function restoreDrafts(userId) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(DRAFTS));
+    const drafts = saved?.userId === userId ? saved.drafts : [];
+    for (const draft of drafts) {
+      const box = document.getElementById(draft.id);
+      if (box?.tagName !== 'TEXTAREA') continue;
+      box.value = draft.value;
+      box.setSelectionRange(draft.start, draft.end);
+    }
+    sessionStorage.removeItem(DRAFTS);
+  } catch {}
 }
 
 // Remember where you were across a reload (tab-session only).
