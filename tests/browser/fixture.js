@@ -55,10 +55,10 @@ export async function appFixture(page, options = {}) {
   return state;
 }
 
-export async function pushFixture(page, { permission = 'default', installed = true, supported = true } = {}) {
-  await page.addInitScript(({ permission, installed, supported }) => {
+export async function pushFixture(page, { permission = 'default', installed = true, supported = true, displayMode = 'standalone' } = {}) {
+  await page.addInitScript(({ permission, installed, supported, displayMode }) => {
     const nativeMatch = window.matchMedia.bind(window);
-    window.matchMedia = query => query === '(display-mode: standalone)' ? { matches: installed } : nativeMatch(query);
+    window.matchMedia = query => /^\(display-mode: (standalone|fullscreen|minimal-ui)\)$/.test(query) ? { matches: installed && query === `(display-mode: ${displayMode})` } : nativeMatch(query);
     let current = permission, sub = null;
     const listeners = [];
     window.__push = { requests: 0, saves: 0, unsubscribes: 0, setPermission(value) { current = value; listeners.forEach(fn => fn()); } };
@@ -71,5 +71,5 @@ export async function pushFixture(page, { permission = 'default', installed = tr
     else delete window.PushManager;
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { ready: Promise.resolve({ pushManager: { getSubscription: async () => sub, subscribe: async () => { sub = subscription; return sub; } } }) } });
     Object.defineProperty(navigator, 'permissions', { configurable: true, value: { query: async () => ({ addEventListener: (_, fn) => listeners.push(fn) }) } });
-  }, { permission, installed, supported });
+  }, { permission, installed, supported, displayMode });
 }

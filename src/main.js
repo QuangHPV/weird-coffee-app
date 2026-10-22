@@ -1,6 +1,6 @@
+import { mountAppShell } from './app-shell.js';
 import { createAccountClient } from './account-client.js';
 import { createDataLoader, LoadError, readResult } from './data-loader.js';
-import './startup.js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
 import { typing, restoreDrafts, saveSpot, takeSpot } from './live-update.js';
@@ -9,6 +9,7 @@ import { startReleaseUpdates } from './release-updates.js';
 import { createAccountCache } from './account-cache.js';
 
 const $ = id => document.getElementById(id);
+mountAppShell();
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
 const demoMember = demoMode && new URLSearchParams(location.search).get('demo') === 'member';
 const authUrl = import.meta.env.VITE_NEON_AUTH_URL;

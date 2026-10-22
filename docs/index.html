@@ -1,27 +1,20 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta name="app-release" content="f66f7d69678276f98705">
+  <meta name="app-release" content="05eb0b5d7d3f1cae589b">
   <meta charset="utf-8">
   <style>
     html{background:#f7f3ed;color:#292019;font-family:system-ui,sans-serif}body{margin:0}button,input,textarea{font:inherit}[hidden]{display:none!important}
     @media(prefers-color-scheme:dark){html{background:#17120f;color:#eee4d9}}
-    .warm-entry #startupIntro{display:none!important}
   </style>
-  <script>
-    try {
-      if (sessionStorage.getItem('anotherCupEntered') || navigator.serviceWorker?.controller) document.documentElement.classList.add('warm-entry');
-      sessionStorage.setItem('anotherCupEntered', '1');
-    } catch {}
-  </script>
   <meta name="color-scheme" content="light dark">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
   <meta name="theme-color" content="#f7f3ed" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#17120f" media="(prefers-color-scheme: dark)">
   <meta name="description" content="Browse Singapore coffee beans and keep your Wish list in sync.">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" href="./icon-any-v2.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-maskable-v2-192.png">
   <link rel="preload" href="./fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./fonts/manrope.css">
   <link rel="preload" href="./fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -37,32 +30,13 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-DXsqOntG.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DFxxJJkI.css">
+  <script type="module" crossorigin src="./assets/index-C6cDbrey.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-YbxJ3fJc.css">
 </head>
 <body>
-  <div id="startupIntro" class="startup-intro" role="dialog" aria-modal="true" aria-label="Another Cup opening animation">
-    <div class="intro-grain" aria-hidden="true"></div>
-    <div class="intro-content" aria-hidden="true">
-      <p class="intro-eyebrow">Two cups · one discovery</p>
-      <div class="intro-stage">
-        <div class="intro-orbit"></div><div class="intro-route"></div>
-        <div class="intro-cups">
-          <div class="intro-cup left"><span class="intro-cup-handle"></span><span class="intro-cup-body"></span><span class="intro-cup-rim"></span><span class="intro-cup-mark"></span></div>
-          <div class="intro-cup right"><span class="intro-cup-handle"></span><span class="intro-cup-body"></span><span class="intro-cup-rim"></span><span class="intro-cup-mark"></span></div>
-        </div>
-        <div class="intro-splash gold"><span class="intro-drop"></span><span class="intro-drop"></span><span class="intro-drop"></span></div>
-        <div class="intro-splash berry"><span class="intro-drop"></span><span class="intro-drop"></span><span class="intro-drop"></span></div>
-        <div class="intro-spark"></div>
-      </div>
-      <h2 class="intro-title">Another Cup</h2>
-      <p class="intro-subtitle">A little more to discover.</p>
-    </div>
-    <button id="introSkip" class="intro-skip" type="button">Skip intro</button>
-  </div>
   <header class="topbar">
     <h1>Find your next bag</h1>
-    <div class="toptools"><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
+    <div class="toptools"><button id="enter-fullscreen" type="button" aria-label="Use full screen" title="Use full screen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
   </header>
   <main>
     <div id="data-status" class="notice data-status" role="status" hidden><span id="data-message"></span><button id="data-retry" type="button">Retry</button></div>

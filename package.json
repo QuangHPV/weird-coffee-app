@@ -9,7 +9,8 @@
     "build": "vite build --base=./ --outDir docs",
     "preview": "vite preview --host 127.0.0.1",
     "test:browser": "playwright test",
-    "test:pwa": "VITE_NEON_AUTH_URL=https://auth.example.invalid/neondb/auth VITE_NEON_DATA_API_URL=https://data.example.invalid/rest/v1 vite build --base=./ --outDir /tmp/coffee-pwa-test-build --emptyOutDir && playwright test -c playwright.pwa.config.js"
+    "test:pwa": "VITE_NEON_AUTH_URL=https://auth.example.invalid/neondb/auth VITE_NEON_DATA_API_URL=https://data.example.invalid/rest/v1 vite build --base=./ --outDir /tmp/coffee-pwa-test-build --emptyOutDir && playwright test -c playwright.pwa.config.js",
+    "build:icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
     "@neondatabase/neon-js": "0.7.0-beta"

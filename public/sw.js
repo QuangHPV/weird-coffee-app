@@ -68,6 +68,16 @@ self.addEventListener('message', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || !url.href.startsWith(scope)) return;
+  // Browser/Android metadata has its own lifecycle. Do not pin it to an old
+  // page's release while that page has a draft open. Failed/offline checks can
+  // still use the current complete shell's manifest.
+  if (url.pathname === new URL('manifest.webmanifest', scope).pathname) {
+    event.respondWith(timedFetch(event.request).then(response => {
+      if (!response.ok) throw new Error('Manifest unavailable');
+      return response;
+    }).catch(async () => (await (await caches.open(CACHE)).match(urlOf('manifest.webmanifest'))) || Response.error()));
+    return;
+  }
   // Release discovery must always observe the server, never a cached manifest.
   if (url.pathname === new URL('release.json', scope).pathname) return;
   event.respondWith((async () => {

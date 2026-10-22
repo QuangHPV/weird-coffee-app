@@ -19,6 +19,7 @@ function release(id) {
       for (const [old, next] of names) html = html.replaceAll(old, next);
       bytes = Buffer.from(html);
     }
+    if (asset.url === 'manifest.webmanifest') { const metadata = JSON.parse(bytes); metadata.description = `metadata-${id}`; bytes = Buffer.from(JSON.stringify(metadata)); }
     if (asset.url === 'fonts/manrope.css') bytes = Buffer.concat([bytes, Buffer.from(`\n/* font-release-${id} */`)]);
     files.set(names.get(asset.url), bytes);
   }
@@ -227,4 +228,15 @@ test('a new page adopts its staged worker when an old network-first worker still
     if (!worker) return null;
     return new Promise(resolve => { const channel = new MessageChannel(); const timer = setTimeout(() => resolve(null), 1000); channel.port1.onmessage = event => { clearTimeout(timer); resolve(event.data.id); }; worker.postMessage({ type: 'RELEASE_STATUS' }, [channel.port2]); });
   }), { timeout: 15000 }).toBe('B');
+});
+
+
+test('installed-app metadata is fresh even while an old page defers a code update', async ({ page, context }) => {
+  await open(page);
+  await page.locator('[data-view=backlog]').click(); await page.locator('#request-text').fill('Keep my draft');
+  state.id = 'B';
+  expect(await page.evaluate(async () => (await (await fetch('./manifest.webmanifest')).json()).description)).toBe('metadata-B');
+  await context.setOffline(true);
+  expect(await page.evaluate(async () => (await (await fetch('./manifest.webmanifest')).json()).description)).toBe('metadata-A');
+  expect(await current(page)).toBe('A');
 });

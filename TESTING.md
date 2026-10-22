@@ -26,7 +26,7 @@ still enforced by Neon; no policies, grants or production schema were relaxed.
 ## Automated checks
 
 - `npm test`: 18 tests for backlog helpers and loading orchestration.
-- `npm run test:browser`: 46 mobile Chrome tests. The API and permission responses
+- `npm run test:browser`: 55 mobile Chrome tests. The API and permission responses
   are intercepted locally; this suite cannot create production accounts or data.
 - `npm run build` and `git diff --check`.
 
@@ -216,3 +216,68 @@ The upstream intermittent authorization issue remains unconfirmed.
 Physical Android timing and visual verification are still needed. Background
 OS suspension and notification delivery can delay updates; visible polling
 latency starts when a complete release is available from hosting.
+
+
+## Android shell, gesture strip and launch branding (2026-10-22)
+
+The supplied screenshot shows Android's gesture handle in a native light strip
+below the app navigation, rather than trailing document padding. The manifest
+now requests `fullscreen`, which uses the full display on supported Android
+installations and hides both native status and navigation bars. The standard
+fallback chain remains standalone/minimal-ui/browser. The explicit manifest ID
+resolves to the former start URL, preserving the installed app identity.
+
+Existing WebAPKs may retain standalone mode until Android updates their metadata.
+An Android-only **Use full screen** header icon is shown in those installed modes
+when the Fullscreen API is supported. It requests fullscreen only after a tap,
+with `navigationUI: hide`; it disappears once fullscreen is active. Ordinary web
+tabs and installations already in fullscreen do not show it. Edge gestures retain
+access to system controls. This is a real viewport/system-bar change, rather than
+recoloring the native gap. Manifest fullscreen may hide the top status bar too.
+
+The fixed app nav now has constant maximum-inset padding and a compositor bottom
+offset, following Chrome's edge-to-edge guidance. Its visible height drives the
+content reserve; the former hard-coded 110px reserve and wide-screen sticky-nav
+behavior are removed. `100dvh` follows viewport height, with `100vh` fallback.
+The viewport requests `interactive-widget=resizes-content` for Android keyboard
+resizing, and lateral safe areas protect controls in landscape.
+
+The mobile page no longer adds its own timed opening animation. Desktop animation
+files remain intact. Separate transparent general icons and opaque maskable icons
+are rendered from the existing SVG; the artwork fits the full central 40%-radius
+safe circle. New icon filenames and matching splash/icon background metadata
+replace the old baked-in square treatment. `npm run build:icons` reproducibly
+renders these vector assets with librsvg. Standard metadata cannot suppress the
+Android system's own launch window.
+
+The worker fetches the web app manifest from the network, even for an old client
+that is postponing a code update, and falls back to its current complete cached
+manifest offline. Website release checks remain separate from Android WebAPK
+updates. For developer verification use `about://webapks`; Chrome may need the app
+closed, Wi-Fi and charging before replacing installed metadata. Clearing account
+data is not required.
+
+Nine added browser checks cover dynamic/max bottom inset transitions, constant
+nav geometry, content clearance, 320/390px portrait and 844px landscape, keyboard
+resize/restore, hidden-nav clearance, absence of a second splash, fullscreen
+notification eligibility, stable identity, icon transparency/mask safety, and
+the explicit legacy fullscreen action. The PWA suite now has 13 cases, including
+fresh metadata during a deferred code release and offline metadata fallback.
+
+References:
+- https://developer.chrome.com/docs/css-ui/edge-to-edge
+- https://web.dev/learn/pwa/app-design
+- https://web.dev/articles/maskable-icon
+- https://web.dev/articles/manifest-updates
+
+
+Native Android follow-up: a read-only Android 15 emulator with Chrome 124 used an
+isolated local build and fake account/catalog APIs. Its native Chrome first-run
+UI repeatedly stalled; after disabling those prompts and reducing emulator
+resolution, the actual Fullscreen API succeeded with a simulated user activation.
+The layout viewport and app nav bottom expanded from 828px to the full 960px
+screen height. An Android system screenshot confirmed removal of the gesture
+strip and status/browser bars. This verifies the native API workaround; it is
+not a claim that a freshly minted WebAPK or the user's particular phone has been
+verified. The nine layout/action checks and all 13 production-worker checks pass;
+the existing loading, account, interaction and notification checks also pass.

@@ -15,7 +15,7 @@ const bounded = async promise => {
 
 export function mountPushPrompt({ client, panel, enable, dismiss, message, enabled = true }) {
   let profile = null, busy = false, generation = 0, saved = '', asked = stored(ASKED);
-  let installed = stored(INSTALLED) || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  let installed = stored(INSTALLED) || ['standalone', 'fullscreen', 'minimal-ui'].some(mode => matchMedia(`(display-mode: ${mode})`).matches) || navigator.standalone === true;
   const eligible = () => enabled && client && profile?.setup_complete && (profile.role === 'admin' || profile.tour_complete) && pushSupported();
   async function sync() {
     if (!eligible() || Notification.permission !== 'granted' || !navigator.onLine || busy) return;
