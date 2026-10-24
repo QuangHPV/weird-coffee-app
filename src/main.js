@@ -7,6 +7,7 @@ import { typing, restoreDrafts, saveSpot, takeSpot } from './live-update.js';
 import { mountPushPrompt } from './push.js';
 import { startReleaseUpdates } from './release-updates.js';
 import { createAccountCache } from './account-cache.js';
+import { plannerCard, rowMark, runPlan } from './activity-model.js';
 
 const $ = id => document.getElementById(id);
 mountAppShell();
@@ -22,6 +23,8 @@ let snapshot = null;
 let ranking = null;
 let profile = null;
 let archiveIds = new Set();
+let showQuietScans = localStorage.getItem('mobileImportantScans') === 'false';
+let activityDetailId = null;
 let showingSetup = false;
 let tourStep = 0;
 let requests = [];
@@ -115,8 +118,11 @@ const demoSnapshot = {
     { old_id: 'demo/03', new_id: 'demo/04', confidence: 0.96, reason: 'Same farm and lot number; the new page only adds a process line.', changes: ['process added'], evidence: [] }
   ],
   runs: [
-    { finished_at: '2026-09-26T10:00:00Z', source: 'daily', status: 'Completed', labeled_count: 2, events: [{ event: 'new', roaster: 'Northline Coffee', title: 'Ethiopia Sidama' }] },
-    { finished_at: '2026-09-25T10:00:00Z', source: 'manual', status: 'Completed', labeled_count: 0, events: [] }
+    { id: 3, started_at: '2026-09-27T10:00:00Z', source: 'recovery', status: 'partial', scrape_status: 'partial', labeled_count: 0, events: [],
+      queue: [{ roaster: 'Northline Coffee', status: 'waiting', reason: 'rate_limited', next_try: '2099-01-01T10:00:00Z', resolved: false }] },
+    { id: 2, started_at: '2026-09-26T10:00:00Z', source: 'daily', status: 'partial', scrape_status: 'partial', labeled_count: 2, events: [{ event: 'new', roaster: 'Northline Coffee', title: 'Ethiopia Sidama' }],
+      queue: [{ roaster: 'Northline Coffee', status: 'waiting', reason: 'rate_limited', next_try: '2099-01-01T10:00:00Z', resolved: false }, { roaster: 'Daybreak Roasters', status: 'ok', resolved: false }] },
+    { id: 1, started_at: '2026-09-25T10:00:00Z', source: 'manual', status: 'success', scrape_status: 'success', labeled_count: 0, events: [], queue: [] }
   ]
 };
 
@@ -1173,16 +1179,24 @@ async function saveRanking(ids) {
   }
 }
 
-const importantScans = $('important-scans');
-importantScans.checked = localStorage.getItem('mobileImportantScans') !== 'false';
-importantScans.onchange = () => {
-  localStorage.setItem('mobileImportantScans', String(importantScans.checked));
+$('important-scans').onclick = () => {
+  showQuietScans = !showQuietScans;
+  localStorage.setItem('mobileImportantScans', String(!showQuietScans));
   renderActivity();
 };
 function activityTime(value) {
   const parsed = new Date(value);
   return value && !Number.isNaN(parsed.valueOf())
     ? parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Time unavailable';
+}
+function activityDay(value) {
+  const parsed = new Date(value);
+  if (!value || Number.isNaN(parsed.valueOf())) return 'Time unavailable';
+  const midnight = date => new Date(date).setHours(0, 0, 0, 0);
+  const days = Math.round((midnight(new Date()) - midnight(parsed)) / 86400000);
+  const clock = parsed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const day = days === 0 ? 'Today' : days === 1 ? 'Yesterday' : parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${day}, ${clock}`;
 }
 function activityStages(run) {
   const total = run.roasters_total || 0, done = run.roasters_done || 0;
@@ -1200,81 +1214,150 @@ function activityStages(run) {
     : run.label_status === 'failed' ? `Processing failed — ${listings(run.labeled_count)} labeled by ${provider}` : 'Processing waiting';
   return [scraping, processing];
 }
+const eventLabels = { new: 'New', sold_out: 'Sold out', gone: 'Gone', restocked: 'Restocked' };
+function runChanges(run) {
+  return (run.events || []).filter(event => event.event !== 'archived_checked' && profile.roasters.includes(event.roaster));
+}
+function changeSummary(run) {
+  const changes = runChanges(run);
+  const parts = Object.keys(eventLabels).map(kind => [changes.filter(event => event.event === kind).length, kind]).filter(([count]) => count)
+    .map(([count, kind]) => `${count} ${eventLabels[kind].toLowerCase()}`);
+  return parts.length ? parts.join(' · ') : 'No changes';
+}
+function runSource(run) {
+  return run.legacy ? 'Earlier scan' : run.source === 'manual' ? 'Manual' : run.source === 'recovery' ? 'Retry' : 'Daily';
+}
+function renderPlan(runs) {
+  const card = plannerCard(runs);
+  const plan = $('activity-plan');
+  plan.className = `plan ${card.tone}`;
+  const bar = node('div', 'plan-bar');
+  for (let index = 0; index < card.total; index += 1) bar.append(node('span', index < card.done ? 'on' : ''));
+  bar.hidden = !card.total;
+  plan.replaceChildren(node('strong', '', card.title), node('p', '', card.detail), bar);
+}
+function openActivityDetail(id, push = true) {
+  activityDetailId = id;
+  if (push) history.pushState({ activityDetail: id }, '');
+  renderActivity();
+  window.scrollTo(0, 0);
+}
+function closeActivityDetail(fromHistory = false) {
+  if (activityDetailId === null) return;
+  activityDetailId = null;
+  if (!fromHistory && history.state?.activityDetail !== undefined) history.back();
+  renderActivity();
+}
+window.addEventListener('popstate', () => { if (activityDetailId !== null) closeActivityDetail(true); });
+function renderActivityRows(all, visible, current) {
+  const rows = visible.map((run, index) => {
+    const row = node('button', 'activity-row');
+    row.type = 'button';
+    row.onclick = () => openActivityDetail(run.id);
+    const copy = node('span', 'activity-copy');
+    copy.append(node('span', 'activity-when', activityDay(run.started_at || run.finished_at)),
+      node('span', 'activity-what', `${runSource(run)} · ${run.status === 'running' ? 'In progress' : changeSummary(run)}`));
+    row.append(copy);
+    const mark = rowMark(run, all);
+    if (mark) row.append(node('span', `activity-mark ${mark.tone}`, mark.text));
+    row.append(node('span', 'activity-chevron', '›'));
+    return row;
+  });
+  $('activity-list').replaceChildren(...rows);
+  $('activity-list').hidden = !rows.length;
+}
+function renderActivityDetail(run, all) {
+  const detail = $('activity-detail');
+  const beans = new Map(snapshot.beans.map(bean => [bean.id, bean]));
+  const back = node('button', 'detail-back', '‹ Activity');
+  back.type = 'button';
+  back.onclick = () => closeActivityDetail();
+  const head = node('header', 'detail-head');
+  head.append(node('h2', '', activityDay(run.started_at || run.finished_at)),
+    node('span', 'muted', `${runSource(run)} refresh${run.status === 'running' ? ' — in progress' : ''}`));
+  const parts = [back, head];
+
+  const plan = runPlan(run, all);
+  if (plan) {
+    const group = node('section', 'detail-group');
+    group.append(node('h3', '', plan.summary));
+    const list = node('ul', 'plain-list');
+    for (const row of plan.rows) {
+      const item = node('li', `roaster-row ${row.state}`);
+      item.append(node('span', '', row.roaster), node('small', '', row.text));
+      list.append(item);
+    }
+    group.append(list);
+    parts.push(group);
+  }
+  if (!run.legacy && run.scrape_status) {
+    const group = node('section', 'detail-group');
+    group.append(node('h3', '', 'Progress'));
+    for (const line of activityStages(run).slice(plan ? 1 : 0)) group.append(node('p', '', line));
+    parts.push(group);
+  }
+  const changes = runChanges(run);
+  for (const kind of Object.keys(eventLabels)) {
+    const items = changes.filter(event => event.event === kind);
+    if (!items.length) continue;
+    const group = node('section', 'detail-group');
+    group.append(node('h3', '', `${eventLabels[kind]} · ${items.length}`));
+    const list = node('ul', 'plain-list');
+    for (const event of items) {
+      const item = node('li', 'change-row');
+      const label = node('span', 'change-text');
+      label.append(node('small', '', event.roaster), node('span', '', event.title));
+      const link = safeLink(event.url, '');
+      if (link) { link.classList.add('change-link'); link.append(label); item.append(link); } else item.append(label);
+      if (archiveIds.has(event.bean_id)) item.append(node('span', 'pill', 'Archived'));
+      list.append(item);
+    }
+    group.append(list);
+    parts.push(group);
+  }
+  if (!changes.length) parts.push(node('p', 'muted detail-empty', 'No listing changes from your roasters.'));
+  const checked = (run.checked_ids || []).filter(id => archiveIds.has(id) && beans.has(id) && profile.roasters.includes(beans.get(id).roaster));
+  if (checked.length) {
+    const group = node('details', 'detail-group');
+    group.append(node('summary', '', `${checked.length} archived ${checked.length === 1 ? 'bean' : 'beans'} checked`));
+    const list = node('ul', 'plain-list');
+    for (const id of checked) {
+      const bean = beans.get(id), item = node('li', 'change-row');
+      const label = node('span', 'change-text');
+      label.append(node('small', '', bean.roaster), node('span', '', bean.title));
+      const link = safeLink(bean.url, '');
+      if (link) { link.classList.add('change-link'); link.append(label); item.append(link); } else item.append(label);
+      list.append(item);
+    }
+    group.append(list);
+    parts.push(group);
+  }
+  const error = [run.scrape_error, run.label_error, run.error].filter(Boolean).join('\n');
+  if (error) {
+    const group = node('details', 'detail-group');
+    group.append(node('summary', '', 'Technical details'), node('p', 'run-error', error));
+    parts.push(group);
+  }
+  detail.replaceChildren(...parts);
+}
 function renderActivity() {
   if (!snapshot) return;
   const all = snapshot.runs || [];
-  const latest = all[0];
   const current = all.find(run => run.status === 'running');
-  $('activity-intro').textContent = current ? `Refresh in progress — started ${activityTime(current.started_at)}`
-    : latest ? `Last refresh — ${activityTime(latest.finished_at || latest.started_at)}` : 'No refreshes yet.';
-  const activity = snapshot.activity;
-  $('activity-totals').textContent = activity?.tracked_since
-    ? `${activity.total_model_batches} model batch ${activity.total_model_batches === 1 ? 'attempt' : 'attempts'} across refreshes — tracked since ${activityTime(activity.tracked_since)}` : '';
-  const selected = event => profile.roasters.includes(event.roaster);
-  const changesOf = run => (run.events || []).filter(event => event.event !== 'archived_checked' && selected(event));
-  const important = run => changesOf(run).length || run.labeled_count > 0
-    || ['running', 'partial', 'failed', 'interrupted'].includes(run.status)
-    || run.scrape_error || run.label_error || run.error;
-  const runs = all.filter((run, index) => !importantScans.checked || index === 0 || important(run));
-  const beans = new Map(snapshot.beans.map(bean => [bean.id, bean]));
-  const sections = runs.map(run => {
-    const section = node('article', 'run');
-    section.dataset.runId = run.id;
-    const head = node('div', 'run-head');
-    const timing = node('div');
-    timing.append(node('time', '', activityTime(run.started_at || run.finished_at)),
-      node('small', 'run-source', run.legacy ? 'Earlier scan — processing count unavailable'
-        : run.source === 'manual' ? 'Manual refresh' : run.source === 'recovery' ? 'Recovery refresh' : 'Daily refresh'));
-    const pills = node('div', 'run-pills');
-    if (run === latest && !current) pills.append(node('span', 'pill', 'Latest'));
-    const changes = changesOf(run);
-    if (run.labeled_count >= 30 || changes.length >= 30) pills.append(node('span', 'pill', 'Large refresh'));
-    const status = { success: 'Completed', partial: 'Partial', failed: 'Failed', interrupted: 'Interrupted', running: 'In progress' }[run.status];
-    if (status) pills.append(node('span', `pill${['partial', 'failed', 'interrupted'].includes(run.status) ? ' out' : ''}`, status));
-    head.append(timing, pills);
-    section.append(head);
-    if (!run.legacy && run.scrape_status) {
-      for (const line of activityStages(run)) section.append(node('p', 'run-stage', line));
-    }
-    const error = [run.scrape_error, run.label_error, run.error].filter(Boolean).join('\n');
-    if (error) section.append(node('p', 'run-error', error));
-    const counts = node('div', 'run-counts');
-    for (const kind of ['new', 'sold_out', 'gone', 'restocked']) {
-      const count = changes.filter(event => event.event === kind).length;
-      if (count) counts.append(node('span', 'pill', `${count} ${kind.replaceAll('_', ' ')}`));
-    }
-    if (!changes.length) counts.append(node('p', '', 'No listing changes recorded from your roasters'));
-    section.append(counts);
-    if (changes.length) {
-      const list = node('ul');
-      for (const event of changes) {
-        const line = node('li');
-        const text = `${event.event.replaceAll('_', ' ')} · ${event.roaster} · ${event.title}`;
-        line.append(safeLink(event.url, text) || node('span', '', text));
-        if (archiveIds.has(event.bean_id)) line.append(node('span', 'pill run-archived', 'Archived'));
-        list.append(line);
-      }
-      section.append(list);
-    }
-    const checked = (run.checked_ids || []).filter(id => archiveIds.has(id) && beans.has(id) && selected(beans.get(id)));
-    if (checked.length) {
-      const details = node('details', 'run-archives');
-      details.append(node('summary', '', `${checked.length} archived ${checked.length === 1 ? 'bean' : 'beans'} checked`));
-      const list = node('ul');
-      for (const id of checked) {
-        const bean = beans.get(id), row = node('li');
-        row.append(safeLink(bean.url, `${bean.roaster} · ${bean.title}`) || node('span', '', bean.title));
-        list.append(row);
-      }
-      details.append(list);
-      section.append(details);
-    }
-    return section;
-  });
-  const open = new Set([...$('activity-list').querySelectorAll('.run:has(details[open])')].map(section => section.dataset.runId));
-  for (const section of sections) if (open.has(section.dataset.runId)) section.querySelector('details')?.setAttribute('open', '');
-  $('activity-list').replaceChildren(...sections);
-  if (!all.length) $('activity-list').append(node('div', 'empty-state', 'No refreshes yet.'));
+  renderPlan(all);
+  const open = activityDetailId === null ? null : all.find(run => run.id === activityDetailId);
+  if (activityDetailId !== null && !open) activityDetailId = null;
+  $('activity-main').hidden = Boolean(open);
+  $('activity-detail').hidden = !open;
+  if (open) { renderActivityDetail(open, all); return; }
+  const important = run => runChanges(run).length || run.labeled_count > 0 || run.status === 'running' || run.status === 'interrupted'
+    || (!run.queue?.length && ['partial', 'failed'].includes(run.status));
+  const visible = all.filter((run, index) => showQuietScans || index === 0 || important(run));
+  renderActivityRows(all, visible, current);
+  const hidden = all.length - visible.length;
+  $('important-scans').hidden = !hidden && !showQuietScans;
+  $('important-scans').textContent = showQuietScans ? 'Hide quiet scans' : `Show ${hidden} quiet ${hidden === 1 ? 'scan' : 'scans'}`;
+  $('activity-empty').hidden = Boolean(all.length);
 }
 
 function render() { renderReplacements(); renderBrowse(); renderWishlist(); renderActivity(); }
@@ -1339,6 +1422,7 @@ function setView(next) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
+  if (activityDetailId !== null) { activityDetailId = null; if (history.state?.activityDetail !== undefined) history.back(); renderActivity(); }
   window.scrollTo(0, 0);
   if (view === 'backlog') refreshBacklogView();
 }

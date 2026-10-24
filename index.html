@@ -78,11 +78,14 @@
         <ol id="wish-list" class="wish-list"></ol>
       </section>
       <section id="activity" aria-labelledby="activity-heading" hidden>
-        <div class="section-heading"><div><span class="eyebrow">Recent history</span><h2 id="activity-heading">Activity</h2></div></div>
-        <p id="activity-intro" class="muted">Coffee changes from your roasters appear here.</p>
-        <p id="activity-totals" class="muted"></p>
-        <label class="activity-filter"><input id="important-scans" type="checkbox" checked> Important scans only</label>
-        <div id="activity-list"></div>
+        <div id="activity-main">
+          <div class="section-heading"><div><span class="eyebrow">Recent history</span><h2 id="activity-heading">Activity</h2></div></div>
+          <div id="activity-plan" class="plan" role="status"></div>
+          <div id="activity-list" class="activity-list"></div>
+          <p id="activity-empty" class="muted" hidden>No refreshes yet.</p>
+          <button id="important-scans" class="quiet-toggle" type="button"></button>
+        </div>
+        <div id="activity-detail" class="activity-detail" hidden></div>
       </section>
       <section id="backlog" aria-label="Requests and backlog" hidden>
         <div id="backlog-root" class="backlog-shell"></div>

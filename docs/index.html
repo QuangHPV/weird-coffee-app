@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta name="app-release" content="05eb0b5d7d3f1cae589b">
+  <meta name="app-release" content="d19192f4bd733703c11f">
   <meta charset="utf-8">
   <style>
     html{background:#f7f3ed;color:#292019;font-family:system-ui,sans-serif}body{margin:0}button,input,textarea{font:inherit}[hidden]{display:none!important}
@@ -30,8 +30,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-C6cDbrey.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-YbxJ3fJc.css">
+  <script type="module" crossorigin src="./assets/index-DRaNlJe6.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DMFqQWlV.css">
 </head>
 <body>
   <header class="topbar">
@@ -80,11 +80,14 @@
         <ol id="wish-list" class="wish-list"></ol>
       </section>
       <section id="activity" aria-labelledby="activity-heading" hidden>
-        <div class="section-heading"><div><span class="eyebrow">Recent history</span><h2 id="activity-heading">Activity</h2></div></div>
-        <p id="activity-intro" class="muted">Coffee changes from your roasters appear here.</p>
-        <p id="activity-totals" class="muted"></p>
-        <label class="activity-filter"><input id="important-scans" type="checkbox" checked> Important scans only</label>
-        <div id="activity-list"></div>
+        <div id="activity-main">
+          <div class="section-heading"><div><span class="eyebrow">Recent history</span><h2 id="activity-heading">Activity</h2></div></div>
+          <div id="activity-plan" class="plan" role="status"></div>
+          <div id="activity-list" class="activity-list"></div>
+          <p id="activity-empty" class="muted" hidden>No refreshes yet.</p>
+          <button id="important-scans" class="quiet-toggle" type="button"></button>
+        </div>
+        <div id="activity-detail" class="activity-detail" hidden></div>
       </section>
       <section id="backlog" aria-label="Requests and backlog" hidden>
         <div id="backlog-root" class="backlog-shell"></div>
