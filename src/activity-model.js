@@ -59,11 +59,12 @@ function names(entries, limit = 2) {
 export function timeline(runs, now = new Date()) {
   const state = queueState(runs);
   const chain = chainOf(runs).filter(run => run.queue?.length).reverse();
-  const finished = new Set();
+  const status = new Map();
   const steps = chain.map(run => {
-    for (const entry of run.queue) if (entry.status === 'ok') finished.add(entry.roaster);
-    return { when: run.started_at, text: `${finished.size} of ${state.total}`, state: 'past' };
+    for (const entry of run.queue) status.set(entry.roaster, entry.status);
+    return { when: run.started_at, text: `${[...status.values()].filter(value => value === 'ok').length} of ${state.total}`, state: 'past' };
   });
+  steps.splice(0, Math.max(0, steps.length - 4));
   if (!state.outOfRetries) {
     const groups = new Map();
     for (const entry of state.waiting) groups.set(entry.next_try, (groups.get(entry.next_try) || 0) + 1);
