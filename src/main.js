@@ -1231,10 +1231,25 @@ function renderPlan(runs) {
   const card = plannerCard(runs);
   const plan = $('activity-plan');
   plan.className = `plan ${card.tone}`;
-  const bar = node('div', 'plan-bar');
-  for (let index = 0; index < card.total; index += 1) bar.append(node('span', index < card.done ? 'on' : ''));
-  bar.hidden = !card.total;
-  plan.replaceChildren(node('strong', '', card.title), node('p', '', card.detail), bar);
+  const parts = [node('strong', '', card.title)];
+  if (card.detail) parts.push(node('p', '', card.detail));
+  if (card.steps.length) {
+    const steps = node('ol', 'plan-steps');
+    for (const step of card.steps) {
+      const item = node('li', step.state);
+      item.append(node('time', '', planTime(step.when)), node('span', '', step.text));
+      steps.append(item);
+    }
+    parts.push(steps);
+  }
+  plan.replaceChildren(...parts);
+}
+function planTime(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.valueOf())) return '';
+  const clock = parsed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const days = Math.round((new Date(parsed).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+  return days === 0 ? clock : days === 1 ? `Tomorrow ${clock}` : `${parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${clock}`;
 }
 function openActivityDetail(id, push = true) {
   activityDetailId = id;

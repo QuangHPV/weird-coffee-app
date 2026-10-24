@@ -55,34 +55,42 @@ function names(entries, limit = 2) {
   return list.length <= limit ? list.join(' and ') : `${list.slice(0, limit).join(', ')} and ${list.length - limit} more`;
 }
 
-// The planner card at the top of Activity: what we have, what is queued, and when it continues.
+// Steps for the planner timeline: each past try with how many roasters were done, then the planned retries.
+export function timeline(runs, now = new Date()) {
+  const state = queueState(runs);
+  const chain = chainOf(runs).filter(run => run.queue?.length).reverse();
+  const finished = new Set();
+  const steps = chain.map(run => {
+    for (const entry of run.queue) if (entry.status === 'ok') finished.add(entry.roaster);
+    return { when: run.started_at, text: `${finished.size} of ${state.total}`, state: 'past' };
+  });
+  if (!state.outOfRetries) {
+    const groups = new Map();
+    for (const entry of state.waiting) groups.set(entry.next_try, (groups.get(entry.next_try) || 0) + 1);
+    let left = state.waiting.length;
+    for (const [when, count] of [...groups].slice(0, 2)) {
+      steps.push({ when, text: `${state.total - left + count} of ${state.total}`, state: 'next' });
+      left -= count;
+    }
+  }
+  return steps;
+}
+
+// The planner card at the top of Activity.
 export function plannerCard(runs, now = new Date()) {
   const current = runs.find(run => run.status === 'running');
   const state = queueState(runs);
   if (current) {
     const total = current.roasters_total || state.total;
-    return { tone: 'busy', title: 'Refreshing now', detail: total ? `${current.roasters_done || 0} of ${total} roasters checked` : 'Starting', done: current.roasters_done || 0, total };
+    return { tone: 'busy', title: 'Refreshing now', detail: total ? `${current.roasters_done || 0} of ${total} roasters checked` : 'Starting', steps: [] };
   }
   if (state.waiting.length) {
-    const first = state.waiting[0].next_try;
-    const due = state.waiting.filter(entry => entry.next_try === first).length;
-    const next = state.outOfRetries ? 'The rest will be tried at the next daily refresh.'
-      : new Date(first) <= now ? `Trying the rest shortly.`
-      : `Next try ${timeOf(first, now)}${due < state.waiting.length ? ` for ${due} of them` : ''}.`;
-    return {
-      tone: 'waiting',
-      title: `Caught up on ${state.done} of ${state.total} roasters`,
-      detail: `${names(state.waiting)} ${state.waiting.length === 1 ? 'is' : 'are'} ${reasonText(state.waiting[0].reason)}. ${next}`,
-      done: state.done,
-      total: state.total,
-    };
+    return { tone: 'waiting', title: `${state.done} of ${state.total} roasters done`, detail: state.outOfRetries ? 'The rest wait for the daily refresh' : '', steps: timeline(runs, now) };
   }
   const latest = runs[0];
-  if (!latest) return { tone: 'done', title: 'No refreshes yet', detail: 'Coffee changes from your roasters appear here.', done: 0, total: 0 };
-  if (state.failed.length) {
-    return { tone: 'waiting', title: `Caught up on ${state.done} of ${state.total} roasters`, detail: `${names(state.failed)} could not be read. See the latest refresh.`, done: state.done, total: state.total };
-  }
-  return { tone: 'done', title: 'All caught up', detail: `Last refresh ${timeOf(latest.finished_at || latest.started_at, now)}`, done: state.total, total: state.total };
+  if (!latest) return { tone: 'done', title: 'No refreshes yet', detail: 'Coffee changes from your roasters appear here.', steps: [] };
+  if (state.failed.length) return { tone: 'waiting', title: `${state.done} of ${state.total} roasters done`, detail: `${names(state.failed)} could not be read`, steps: [] };
+  return { tone: 'done', title: 'All caught up', detail: `Last refresh ${timeOf(latest.finished_at || latest.started_at, now)}`, steps: [] };
 }
 
 // What one run did, for the detail view.

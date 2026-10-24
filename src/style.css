@@ -412,11 +412,17 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .plan strong{font-family:"Bricolage Grotesque",var(--app-font);font-size:1.05rem;font-weight:750;letter-spacing:-.01em}
 .plan p{margin:5px 0 0;font-size:.84rem;color:#6f635a}
 .plan.waiting{background:#fbf3e6;border-color:#ecd9bb}
-.plan-bar{display:flex;gap:4px;margin-top:13px}
-.plan-bar span{flex:1;height:5px;border-radius:4px;background:#e6d9cb}
-.plan-bar span.on{background:#8a5733}
-.plan.busy .plan-bar span.on{animation:plan-pulse 1.6s ease-in-out infinite}
-@keyframes plan-pulse{50%{opacity:.45}}
+.plan-steps{list-style:none;margin:12px 0 0;padding:0 0 0 4px;display:grid;gap:0}
+.plan-steps li{position:relative;display:flex;justify-content:space-between;gap:12px;padding:0 0 12px 20px;font-size:.84rem}
+.plan-steps li:last-child{padding-bottom:0}
+.plan-steps li::before{content:"";position:absolute;left:0;top:.35em;width:9px;height:9px;border-radius:50%;background:#8a5733}
+.plan-steps li::after{content:"";position:absolute;left:4px;top:1.2em;bottom:-.3em;width:1px;background:#8a5733}
+.plan-steps li:last-child::after{display:none}
+.plan-steps li.next::before{background:none;border:2px solid #8a5733}
+.plan-steps li.next::after{background:none;border-left:1px dashed #8a5733}
+.plan-steps time{color:#6f635a}
+.plan-steps span{font-weight:700}
+.plan-steps li.next span{color:#8a5733}
 .activity-list{background:#fffdfa;border:1px solid #e5d9cd;border-radius:16px;overflow:hidden}
 .activity-row{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;text-align:left;color:inherit;padding:14px 16px;min-height:60px}
 .activity-row+.activity-row{border-top:1px solid #efe5d9}
@@ -430,7 +436,7 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .quiet-toggle{display:block;margin:14px auto 0;border:0;background:none;color:#8a7c70;font-size:.8rem;font-weight:700;padding:8px 12px;text-decoration:none}
 .activity-detail{animation:detail-in .22s cubic-bezier(.22,1,.36,1)}
 @keyframes detail-in{from{opacity:0;transform:translateX(22px)}}
-@media(prefers-reduced-motion:reduce){.activity-detail{animation:none}.plan.busy .plan-bar span.on{animation:none}}
+@media(prefers-reduced-motion:reduce){.activity-detail{animation:none}}
 .detail-back{border:0;background:none;color:#704627;font-weight:700;font-size:.95rem;padding:6px 10px 6px 0;margin-bottom:6px;text-decoration:none}
 .detail-head{display:grid;gap:2px;margin-bottom:18px}
 .detail-head h2{margin:0}
@@ -453,7 +459,7 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
   .plan,.activity-list,.detail-group{background:#221b16;border-color:#413426}
   .plan.waiting{background:#2c2114;border-color:#5a4429}
   .plan p,.detail-group p{color:#b5a69a}
-  .plan-bar span{background:#3d3226}.plan-bar span.on{background:#c99b7d}
+  .plan-steps li::before{background:#c99b7d}.plan-steps li::after{background:#c99b7d}.plan-steps li.next::before{background:none;border-color:#c99b7d}.plan-steps li.next::after{background:none;border-color:#c99b7d}.plan-steps time{color:#b5a69a}.plan-steps li.next span{color:#d2a77f}
   .activity-row+.activity-row,.roaster-row+.roaster-row,.change-row+.change-row{border-color:#352a1f}
   .activity-row:active{background:#2a2119}
   .activity-what,.roaster-row small,.change-text small{color:#a09388}

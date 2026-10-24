@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { plannerCard, queueState, rowMark, runPlan } from '../src/activity-model.js';
+import { plannerCard, timeline, queueState, rowMark, runPlan } from '../src/activity-model.js';
 
 const now = new Date('2026-10-24T05:00:00Z');
 const later = new Date(now.getTime() + 3600000).toISOString();
@@ -10,9 +10,9 @@ const root = { id: 2, source: 'scheduled', status: 'partial', started_at: now.to
 
 test('planner says how much is done and when the rest continues', () => {
   const card = plannerCard([root], now);
-  assert.equal(card.title, 'Caught up on 1 of 3 roasters');
-  assert.match(card.detail, /B and C are limiting requests\. Next try /);
+  assert.equal(card.title, '1 of 3 roasters done');
   assert.equal(card.tone, 'waiting');
+  assert.deepEqual(card.steps.map(step => [step.state, step.text]), [['past', '1 of 3'], ['next', '3 of 3']]);
 });
 
 test('a retry that finishes a roaster removes it from the queue', () => {
@@ -20,7 +20,7 @@ test('a retry that finishes a roaster removes it from the queue', () => {
     queue: [entry('B', 'ok'), entry('C', 'waiting', { next_try: later })] };
   const runs = [retry, { ...root, queue: root.queue.map(item => item.roaster === 'B' ? { ...item, resolved: true } : item) }];
   assert.equal(queueState(runs).waiting.length, 1);
-  assert.equal(plannerCard(runs, now).title, 'Caught up on 2 of 3 roasters');
+  assert.equal(plannerCard(runs, now).title, '2 of 3 roasters done');
   assert.equal(runPlan(runs[1], runs).rows[1].text, 'Done on a retry');
   assert.equal(rowMark(runs[1], runs).text, 'Retrying');
 });
@@ -33,7 +33,8 @@ test('everything done reads as caught up and shows no mark', () => {
 
 test('after the retry budget the plan points to the daily refresh', () => {
   const retries = Array.from({ length: 6 }, (_, index) => ({ id: 10 + index, source: 'recovery', status: 'partial', started_at: now.toISOString(), queue: [entry('B', 'waiting', { next_try: later })] }));
-  assert.match(plannerCard([...retries, root], now).detail, /next daily refresh/);
+  assert.match(plannerCard([...retries, root], now).detail, /daily refresh/);
+  assert.ok(plannerCard([...retries, root], now).steps.every(step => step.state === 'past'));
 });
 
 test('a running refresh shows its progress', () => {

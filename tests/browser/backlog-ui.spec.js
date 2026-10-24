@@ -27,15 +27,16 @@ test('Activity lists runs simply and opens one run into its details', async ({ p
   const app = await appFixture(page);
   app.archives = ['bean-0'];
   app.runs = [
-    { id: 3, started_at: '2026-10-22T10:00:00Z', source: 'scheduled', status: 'partial', scrape_status: 'partial', label_status: 'skipped', scrape_error: 'Test Roaster: HTTP Error 429', events: [],
+    { id: 3, started_at: new Date().toISOString(), source: 'scheduled', status: 'partial', scrape_status: 'partial', label_status: 'skipped', scrape_error: 'Test Roaster: HTTP Error 429', events: [],
       queue: [{ roaster: 'Test Roaster', status: 'waiting', reason: 'rate_limited', next_try: '2099-01-01T10:00:00Z', resolved: false }, { roaster: 'Other Roaster', status: 'ok', resolved: false }] },
     { id: 2, started_at: '2026-10-21T10:00:00Z', source: 'manual', status: 'success', scrape_status: 'success', roasters_done: 9, label_status: 'success', provider: 'claude', labeled_count: 11, model_batches: 2, checked_ids: ['bean-0', 'bean-1'], events: [{ event: 'new', bean_id: 'bean-0', roaster: 'Test Roaster', title: 'Coffee 1', url: 'https://shop.example.invalid/coffee' }, { event: 'new', roaster: 'Other Roaster', title: 'Other coffee' }] },
     { id: 1, started_at: '2026-10-20T10:00:00Z', source: 'scheduled', status: 'success', scrape_status: 'success', roasters_done: 9, label_status: 'skipped', events: [] },
   ];
   await app.open();
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
-  await expect(page.locator('#activity-plan')).toContainText('Caught up on 1 of 2 roasters');
-  await expect(page.locator('#activity-plan')).toContainText('Test Roaster is limiting requests');
+  await expect(page.locator('#activity-plan')).toContainText('1 of 2 roasters done');
+  await expect(page.locator('#activity-plan .plan-steps li')).toHaveCount(2);
+  await expect(page.locator('#activity-plan .plan-steps li.next')).toContainText('2 of 2');
   await expect(page.locator('#activity-list')).not.toContainText('HTTP Error 429');
   await expect(page.locator('.activity-row')).toHaveCount(2);
   await expect(page.locator('.activity-row').nth(0)).toContainText('Retrying');
