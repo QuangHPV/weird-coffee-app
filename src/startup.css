@@ -201,7 +201,7 @@
   bottom: max(22px, env(safe-area-inset-bottom));
   padding: 9px 13px;
   border: 1px solid #ad977f;
-  border-radius: 999px;
+  border-radius:4px;
   background: #f8f0e5;
   color: var(--intro-ink);
   font: 700 12px var(--app-font, system-ui), sans-serif;
