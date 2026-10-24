@@ -28,7 +28,7 @@ export function queueState(runs) {
     .sort((a, b) => (a.next_try || '').localeCompare(b.next_try || ''));
   const root = chain[chain.length - 1];
   const retries = chain.length - 1;
-  const outOfRetries = retries >= RETRY_LIMIT || Date.now() - new Date(root?.started_at).valueOf() > 86400000;
+  const outOfRetries = retries >= RETRY_LIMIT || waiting.every(entry => !entry.next_try) || Date.now() - new Date(root?.started_at).valueOf() > 86400000;
   return {
     total: entries.length,
     done: entries.filter(entry => entry.status === 'ok').length,
@@ -67,7 +67,7 @@ export function timeline(runs, now = new Date()) {
   steps.splice(0, Math.max(0, steps.length - 4));
   if (!state.outOfRetries) {
     const groups = new Map();
-    for (const entry of state.waiting) groups.set(entry.next_try, (groups.get(entry.next_try) || 0) + 1);
+    for (const entry of state.waiting.filter(item => item.next_try)) groups.set(entry.next_try, (groups.get(entry.next_try) || 0) + 1);
     let left = state.waiting.length;
     for (const [when, count] of [...groups].slice(0, 2)) {
       steps.push({ when, text: `${state.total - left + count} of ${state.total}`, state: 'next' });
