@@ -7,7 +7,8 @@ import { typing, restoreDrafts, saveSpot, takeSpot } from './live-update.js';
 import { mountPushPrompt } from './push.js';
 import { startReleaseUpdates } from './release-updates.js';
 import { createAccountCache } from './account-cache.js';
-import { plannerCard, rowMark, runPlan } from './activity-model.js';
+import { rowMark, runPlan, staleRoasters, wishShows, WISH_LEVELS, healthSummary, sourceHealth, ageText } from './activity-model.js';
+import { renderSourcePanel } from './source-panel.js';
 
 const $ = id => document.getElementById(id);
 mountAppShell();
@@ -80,12 +81,12 @@ const SORT_OPTIONS = [
   { key: 'body', label: 'Bright → Rich' },
   { key: 'new', label: 'Newest' }
 ];
-const defaultFilters = () => ({ search: '', vibeQuadrant: null, max: 60, inStock: true, stockBeforeArchive: true, showArchived: false, roastMin: 0, roastMax: 2, includeUnknown: true, roasters: {}, origins: {}, process: {}, sort: 'per100g' });
+const defaultFilters = () => ({ search: '', vibeQuadrant: null, max: 60, inStock: true, trustedOnly: false, stockBeforeArchive: true, showArchived: false, roastMin: 0, roastMax: 2, includeUnknown: true, roasters: {}, origins: {}, process: {}, sort: 'per100g' });
 const cloneFilters = filters => ({ ...filters, roasters: { ...filters.roasters }, origins: { ...filters.origins }, process: { ...filters.process } });
 function savedFilters(raw, roasters) {
   const filters = defaultFilters();
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  for (const key of ['search', 'vibeQuadrant', 'max', 'inStock', 'stockBeforeArchive', 'showArchived', 'roastMin', 'roastMax', 'includeUnknown', 'sort']) {
+  for (const key of ['search', 'vibeQuadrant', 'max', 'inStock', 'trustedOnly', 'stockBeforeArchive', 'showArchived', 'roastMin', 'roastMax', 'includeUnknown', 'sort']) {
     if (typeof source[key] === typeof filters[key] || source[key] === null && filters[key] === null) filters[key] = source[key];
   }
   if (typeof source.vibeQuadrant === 'string') filters.vibeQuadrant = source.vibeQuadrant;
@@ -117,6 +118,10 @@ const demoSnapshot = {
   suggestions: [
     { old_id: 'demo/03', new_id: 'demo/04', confidence: 0.96, reason: 'Same farm and lot number; the new page only adds a process line.', changes: ['process added'], evidence: [] }
   ],
+  activity: { sources: [
+    { roaster: 'Northline Coffee', last_ok: '2026-09-27T10:00:00Z', status: 'waiting', reason: 'rate_limited', attempt: 2, next_try: '2099-01-01T10:00:00Z', history: ['ok', 'ok', 'fail', 'fail'] },
+    { roaster: 'Daybreak Roasters', last_ok: new Date().toISOString(), status: 'ok', attempt: 0, next_try: null, history: ['ok', 'ok', 'ok', 'ok'] }
+  ] },
   runs: [
     { id: 3, started_at: '2026-09-27T10:00:00Z', source: 'recovery', status: 'partial', scrape_status: 'partial', labeled_count: 0, events: [],
       queue: [{ roaster: 'Northline Coffee', status: 'waiting', reason: 'rate_limited', next_try: '2099-01-01T10:00:00Z', resolved: false }] },
@@ -125,6 +130,14 @@ const demoSnapshot = {
     { id: 1, started_at: '2026-09-25T10:00:00Z', source: 'manual', status: 'success', scrape_status: 'success', labeled_count: 0, events: [], queue: [] }
   ]
 };
+
+// Roasters whose data is more than a day old; their lots are marked and can be filtered out.
+let staleMap = new Map();
+function refreshTrust() {
+  staleMap = staleRoasters(snapshot?.activity?.sources || []);
+  const summary = healthSummary(sourceHealth(snapshot?.activity?.sources || []));
+  document.querySelector('nav button[data-view="activity"]')?.classList.toggle('alert', summary.tone !== 'ok');
+}
 
 function node(tag, className, value) {
   const item = document.createElement(tag);
@@ -553,6 +566,7 @@ function matches(bean, filters, skipField = null) {
   if (skipField !== 'roasters' && !filters.roasters[bean.roaster]) return false;
   if (Boolean(bean.archived) !== filters.showArchived) return false;
   if (filters.inStock && (!bean.available || bean.gone)) return false;
+  if (filters.trustedOnly && staleMap.has(bean.roaster)) return false;
   if (bean.per100g && filters.max < 60 && bean.per100g > filters.max) return false;
   if (filters.vibeQuadrant && !fitsQuadrant(bean.label, filters)) return false;
   if (filters.roastMin > 0 || filters.roastMax < ROAST_LEVELS.length - 1) {
@@ -604,6 +618,7 @@ function renderFilterPanel() {
   $('filter-price').setAttribute('aria-valuetext', draftFilters.max >= 60 ? 'Any price' : `Up to $${draftFilters.max} per 100 grams`);
   $('filter-unknown').checked = draftFilters.includeUnknown;
   $('filter-stock').checked = draftFilters.inStock;
+  $('filter-trusted').checked = draftFilters.trustedOnly;
   $('filter-stock').disabled = draftFilters.showArchived;
   $('filter-archived').checked = draftFilters.showArchived;
   $('filter-roast-min').value = draftFilters.roastMin;
@@ -707,7 +722,8 @@ function tasteMeter(left, right, size, point, range, why, title, names) {
 }
 
 function beanCard(bean) {
-  const card = node('article', 'bean-card');
+  const stale = staleMap.get(bean.roaster);
+  const card = node('article', `bean-card${stale ? ' stale-source' : ''}`);
   card.dataset.beanId = bean.id;
   const top = node('div', 'bean-top');
   const titleBox = node('div');
@@ -757,6 +773,7 @@ function beanCard(bean) {
       label.why?.roast, 'Roast', ROAST_LEVELS));
     card.append(top, meta, taste, footer);
   } else card.append(top, meta, footer);
+  if (stale) card.prepend(node('div', 'stale-badge', stale.age == null ? 'Source never read' : `Source out of date, read ${ageText(stale.age)} ago`));
   return card;
 }
 
@@ -864,6 +881,8 @@ function reconcile(container, children) {
 
 function renderBrowse() {
   if (!snapshot) return;
+  refreshTrust();
+  renderBrowseHealth();
   const filtered = snapshot.beans.filter(bean => matches(bean, appliedFilters));
   filtered.sort((a, b) => {
     if (appliedFilters.sort === 'new') return (b.first_seen || '').localeCompare(a.first_seen || '');
@@ -874,7 +893,7 @@ function renderBrowse() {
   $('count').textContent = `${filtered.length} ${filtered.length === 1 ? 'bean' : 'beans'}`;
   const existing = new Map([...$('bean-list').children].map(card => [card.dataset.beanId, card]));
   reconcile($('bean-list'), filtered.map(bean => {
-    const key = JSON.stringify([bean, ranking?.ids.includes(bean.id), saving, savingArchive, navigator.onLine]);
+    const key = JSON.stringify([bean, ranking?.ids.includes(bean.id), saving, savingArchive, navigator.onLine, staleMap.get(bean.roaster)?.age == null ? null : ageText(staleMap.get(bean.roaster).age)]);
     const old = existing.get(bean.id);
     if (old && renderKeys.get(old) === key) return old;
     const card = beanCard(bean); renderKeys.set(card, key); return card;
@@ -894,22 +913,23 @@ function renderBrowse() {
 
 function renderWishlist() {
   if (!ranking || !snapshot) return;
+  refreshTrust();
   const byId = new Map(snapshot.beans.map(bean => [bean.id, bean]));
   $('wish-count').textContent = ranking.ids.length;
   const status = !navigator.onLine ? 'Offline. Reconnect before editing your Wish list.' : saving ? 'Saving…' : '';
   $('wish-status').textContent = status;
   $('wish-status').hidden = !status;
   wishShown = shownWishIds(byId);
-  $('wish-in-stock').checked = wishInStockOnly;
+  renderWishLevel();
   const hidden = ranking.ids.length - wishShown.length;
   $('wish-hidden').textContent = hidden ? `${hidden} hidden` : '';
   const existing = new Map([...$('wish-list').children].map(item => [item.dataset.id, item]));
   const items = wishShown.map((id, index) => {
     const bean = byId.get(id);
-    const key = JSON.stringify([bean, index, wishShown.length, saving, savingArchive, navigator.onLine, pendingReplacements()]);
+    const key = JSON.stringify([bean, index, wishShown.length, saving, savingArchive, navigator.onLine, pendingReplacements(), bean && staleMap.has(bean.roaster)]);
     const old = existing.get(id);
     if (old && renderKeys.get(old) === key) return old;
-    const item = node('li', `wish-item${bean && (!bean.available || bean.gone) ? ' out' : ''}`);
+    const item = node('li', `wish-item${bean && (!bean.available || bean.gone) ? ' out' : ''}${bean && staleMap.has(bean.roaster) ? ' stale-source' : ''}`);
     item.dataset.id = id;
     // Rank bar: position on the left, move arrows on the right. Press and hold the card to drag.
     const bar = node('div', 'wish-bar');
@@ -945,21 +965,27 @@ function renderWishlist() {
   reconcile($('wish-list'), items);
   if (!items.length) {
     const empty = node('li', 'empty-state');
-    empty.append(node('h3', '', ranking.ids.length ? 'Nothing in stock right now' : 'Your Wish list is empty'),
-      node('p', '', ranking.ids.length ? 'Turn off “In stock only” to see all saved beans.' : 'Find a bean you like and tap its heart.'));
+    empty.append(node('h3', '', ranking.ids.length ? 'Nothing at this level' : 'Your Wish list is empty'),
+      node('p', '', ranking.ids.length ? 'Slide to Everything to see all saved beans.' : 'Find a bean you like and tap its heart.'));
     if (!ranking.ids.length) { const button = node('button', '', 'Browse beans'); button.onclick = () => setView('browse'); empty.append(button); }
     $('wish-list').append(empty);
   }
 }
 
-// With "In stock only" on, sold-out and gone beans are hidden but keep their place in the saved order.
-let wishInStockOnly = false;
-try { wishInStockOnly = localStorage.getItem('wishInStockOnly') === 'true'; } catch {}
+// The Wish list slider hides beans by trust but they keep their place in the saved order.
+let wishLevel = 2;
+try { wishLevel = Math.min(2, Math.max(0, Number(localStorage.getItem('wishTrustLevel') ?? 2))) || 0; } catch {}
 let wishShown = [];
 
 function shownWishIds(byId) {
-  if (!wishInStockOnly) return ranking.ids;
-  return ranking.ids.filter(id => { const bean = byId.get(id); return !bean || (bean.available && !bean.gone); });
+  return ranking.ids.filter(id => wishShows(byId.get(id), wishLevel, staleMap));
+}
+
+function renderWishLevel() {
+  $('wish-level').value = wishLevel;
+  $('wish-level').style.setProperty('--fill', `${wishLevel * 50}%`);
+  $('wish-level').setAttribute('aria-valuetext', WISH_LEVELS[wishLevel]);
+  document.querySelectorAll('#wish-ticks button').forEach((button, index) => button.classList.toggle('on', index <= wishLevel));
 }
 
 // Put a new order of the shown beans back into the full list; hidden beans stay where they are.
@@ -969,12 +995,18 @@ function mergeShownOrder(order) {
   return ranking.ids.map(id => shown.has(id) ? order[next++] : id);
 }
 
-$('wish-in-stock').checked = wishInStockOnly;
-$('wish-in-stock').onchange = event => {
-  wishInStockOnly = event.target.checked;
-  try { localStorage.setItem('wishInStockOnly', String(wishInStockOnly)); } catch {}
+function setWishLevel(level) {
+  wishLevel = level;
+  try { localStorage.setItem('wishTrustLevel', String(level)); } catch {}
   renderWishlist();
-};
+}
+$('wish-level').oninput = event => setWishLevel(Number(event.target.value));
+$('wish-ticks').replaceChildren(...WISH_LEVELS.map((name, index) => {
+  const button = node('button', '', name);
+  button.type = 'button';
+  button.onclick = () => setWishLevel(index);
+  return button;
+}));
 
 let pendingWishDrag = null;
 let activeWishDrag = null;
@@ -1227,29 +1259,14 @@ function changeSummary(run) {
 function runSource(run) {
   return run.legacy ? 'Earlier scan' : run.source === 'manual' ? 'Manual' : run.source === 'recovery' ? 'Retry' : 'Daily';
 }
-function renderPlan(runs) {
-  const card = plannerCard(runs);
-  const plan = $('activity-plan');
-  plan.className = `plan ${card.tone}`;
-  const parts = [node('strong', '', card.title)];
-  if (card.detail) parts.push(node('p', '', card.detail));
-  if (card.steps.length) {
-    const steps = node('ol', 'plan-steps');
-    for (const step of card.steps) {
-      const item = node('li', step.state);
-      item.append(node('time', '', planTime(step.when)), node('span', '', step.text));
-      steps.append(item);
-    }
-    parts.push(steps);
-  }
-  plan.replaceChildren(...parts);
-}
-function planTime(value) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.valueOf())) return '';
-  const clock = parsed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  const days = Math.round((new Date(parsed).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
-  return days === 0 ? clock : days === 1 ? `Tomorrow ${clock}` : `${parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${clock}`;
+// A banner on Browse while any source is out of date; it opens Activity.
+function renderBrowseHealth() {
+  const summary = healthSummary(sourceHealth(snapshot.activity?.sources || []));
+  const box = $('browse-health');
+  box.hidden = summary.tone === 'ok';
+  if (box.hidden) return;
+  box.dataset.tone = summary.tone;
+  box.replaceChildren(node('span', 'src-pulse'), node('span', '', summary.title), node('span', 'browse-health-go', 'Details ›'));
 }
 function openActivityDetail(id, push = true) {
   activityDetailId = id;
@@ -1273,7 +1290,7 @@ function renderActivityRows(all, visible, current) {
     copy.append(node('span', 'activity-when', activityDay(run.started_at || run.finished_at)),
       node('span', 'activity-what', `${runSource(run)} · ${run.status === 'running' ? 'In progress' : changeSummary(run)}`));
     row.append(copy);
-    const mark = rowMark(run, all);
+    const mark = rowMark(run);
     if (mark) row.append(node('span', `activity-mark ${mark.tone}`, mark.text));
     row.append(node('span', 'activity-chevron', '›'));
     return row;
@@ -1292,7 +1309,7 @@ function renderActivityDetail(run, all) {
     node('span', 'muted', `${runSource(run)} refresh${run.status === 'running' ? ' — in progress' : ''}`));
   const parts = [back, head];
 
-  const plan = runPlan(run, all);
+  const plan = runPlan(run);
   if (plan) {
     const group = node('section', 'detail-group');
     group.append(node('h3', '', plan.summary));
@@ -1359,7 +1376,10 @@ function renderActivity() {
   if (!snapshot) return;
   const all = snapshot.runs || [];
   const current = all.find(run => run.status === 'running');
-  renderPlan(all);
+  refreshTrust();
+  renderSourcePanel($('activity-sources'), snapshot.activity?.sources || []);
+  $('activity-live').hidden = !current;
+  if (current) $('activity-live').textContent = `Refreshing now, ${current.roasters_done || 0} of ${current.roasters_total || '?'} roasters checked`;
   const open = activityDetailId === null ? null : all.find(run => run.id === activityDetailId);
   if (activityDetailId !== null && !open) activityDetailId = null;
   $('activity-main').hidden = Boolean(open);
@@ -1443,6 +1463,7 @@ function setView(next) {
 }
 
 document.querySelectorAll('nav button').forEach(button => button.onclick = () => setView(button.dataset.view));
+$('browse-health').onclick = () => setView('activity');
 function openFilters() {
   cancelAccountLoad();
   draftFilters = cloneFilters(appliedFilters);
@@ -1512,6 +1533,7 @@ $('filter-dialog').onkeydown = event => {
 $('filter-search').oninput = event => { draftFilters.search = event.target.value; renderFilterPanel(); };
 $('filter-price').oninput = event => { draftFilters.max = Number(event.target.value); renderFilterPanel(); };
 $('filter-unknown').onchange = event => { draftFilters.includeUnknown = event.target.checked; renderFilterPanel(); };
+$('filter-trusted').onchange = event => { draftFilters.trustedOnly = event.target.checked; renderFilterPanel(); };
 $('filter-stock').onchange = event => { draftFilters.inStock = event.target.checked; draftFilters.stockBeforeArchive = event.target.checked; renderFilterPanel(); };
 $('filter-archived').onchange = event => {
   draftFilters.showArchived = event.target.checked;

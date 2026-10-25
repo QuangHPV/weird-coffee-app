@@ -1,43 +1,53 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { plannerCard, timeline, queueState, rowMark, runPlan } from '../src/activity-model.js';
+import { sourceHealth, healthSummary, staleRoasters, wishShows, rowMark, runPlan, ageText } from '../src/activity-model.js';
 
-const now = new Date('2026-10-24T05:00:00Z');
-const later = new Date(now.getTime() + 3600000).toISOString();
-const entry = (roaster, status, extra = {}) => ({ roaster, status, reason: status === 'waiting' ? 'rate_limited' : null, resolved: false, ...extra });
-const root = { id: 2, source: 'scheduled', status: 'partial', started_at: now.toISOString(), queue: [
-  entry('A', 'ok'), entry('B', 'waiting', { next_try: later }), entry('C', 'waiting', { next_try: later })] };
+const now = new Date('2026-10-26T12:00:00Z').valueOf();
+const hours = count => new Date(now - count * 3600000).toISOString();
+const source = (roaster, last, status = 'ok', next_try = null) => ({ roaster, last_ok: last, status, next_try, history: [] });
 
-test('planner says how much is done and when the rest continues', () => {
-  const card = plannerCard([root], now);
-  assert.equal(card.title, '1 of 3 roasters done');
-  assert.equal(card.tone, 'waiting');
-  assert.deepEqual(card.steps.map(step => [step.state, step.text]), [['past', '1 of 3'], ['next', '3 of 3']]);
+test('a source is up to date within a day and states follow failures and the suggested time', () => {
+  const list = sourceHealth([
+    source('A', hours(2)), source('B', hours(30)),
+    source('C', hours(30), 'waiting', new Date(now + 3600000).toISOString()),
+    source('D', hours(60), 'waiting', new Date(now - 3600000).toISOString()),
+    source('E', null, 'waiting')], now);
+  assert.deepEqual(list.map(item => item.state), ['ok', 'old', 'paused', 'suggested', 'suggested']);
+  assert.deepEqual(list.map(item => item.upToDate), [true, false, false, false, false]);
 });
 
-test('a retry that finishes a roaster removes it from the queue', () => {
-  const retry = { id: 3, source: 'recovery', status: 'partial', started_at: now.toISOString(),
-    queue: [entry('B', 'ok'), entry('C', 'waiting', { next_try: later })] };
-  const runs = [retry, { ...root, queue: root.queue.map(item => item.roaster === 'B' ? { ...item, resolved: true } : item) }];
-  assert.equal(queueState(runs).waiting.length, 1);
-  assert.equal(plannerCard(runs, now).title, '2 of 3 roasters done');
-  assert.equal(runPlan(runs[1], runs).rows[1].text, 'Done on a retry');
-  assert.equal(rowMark(runs[1], runs).text, 'Retrying');
+test('the banner grows more serious as the oldest data ages', () => {
+  const warn = healthSummary(sourceHealth([source('A', hours(2)), source('B', hours(30))], now));
+  assert.equal(warn.tone, 'warn');
+  assert.equal(warn.title, '1 of 2 sources out of date');
+  assert.equal(healthSummary(sourceHealth([source('B', hours(60))], now)).tone, 'down');
+  assert.equal(healthSummary(sourceHealth([source('A', hours(2))], now)).tone, 'ok');
+  const paused = healthSummary(sourceHealth([source('A', hours(2), 'waiting', new Date(now + 3600000).toISOString())], now));
+  assert.equal(paused.title, '1 of 1 sources paused');
+  assert.equal(paused.toScan.length, 1);
 });
 
-test('everything done reads as caught up and shows no mark', () => {
-  const done = { ...root, status: 'success', queue: [entry('A', 'ok'), entry('B', 'ok')], finished_at: now.toISOString() };
-  assert.equal(plannerCard([done], now).title, 'All caught up');
-  assert.equal(rowMark(done, [done]), null);
+test('only sources older than a day are untrusted', () => {
+  const stale = staleRoasters([source('A', hours(2)), source('B', hours(30))], now);
+  assert.deepEqual([...stale.keys()], ['B']);
+  assert.equal(ageText(90 * 60000), '1 h');
+  assert.equal(ageText(3 * 86400000), '3 days');
 });
 
-test('after the retry budget the plan points to the daily refresh', () => {
-  const retries = Array.from({ length: 6 }, (_, index) => ({ id: 10 + index, source: 'recovery', status: 'partial', started_at: now.toISOString(), queue: [entry('B', 'waiting', { next_try: later })] }));
-  assert.match(plannerCard([...retries, root], now).detail, /daily refresh/);
-  assert.ok(plannerCard([...retries, root], now).steps.every(step => step.state === 'past'));
+test('each Wish list level shows everything the level before it shows', () => {
+  const stale = new Map([['Old', {}]]);
+  const stocked = { roaster: 'New', available: true, gone: false };
+  const soldOut = { roaster: 'New', available: false, gone: false };
+  const fromOld = { roaster: 'Old', available: true, gone: false };
+  const shown = level => [stocked, soldOut, fromOld].filter(bean => wishShows(bean, level, stale)).length;
+  assert.deepEqual([0, 1, 2].map(shown), [1, 2, 3]);
+  assert.equal(wishShows(null, 0, stale), true);
 });
 
-test('a running refresh shows its progress', () => {
-  const card = plannerCard([{ id: 4, status: 'running', roasters_done: 3, roasters_total: 9 }, root], now);
-  assert.equal(card.detail, '3 of 9 roasters checked');
+test('run summaries say what was updated, never "retrying"', () => {
+  const run = { status: 'partial', queue: [{ roaster: 'A', status: 'ok' }, { roaster: 'B', status: 'waiting', resolved: false }, { roaster: 'C', status: 'waiting', resolved: true }] };
+  assert.equal(runPlan(run).summary, 'Updated 1 of 3 roasters');
+  assert.deepEqual(runPlan(run).rows.map(row => row.text), ['Updated', 'Not updated', 'Updated later']);
+  assert.equal(rowMark(run).text, 'Incomplete');
+  assert.equal(rowMark({ status: 'success', queue: [{ roaster: 'A', status: 'ok' }] }), null);
 });

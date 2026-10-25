@@ -26,6 +26,9 @@ for (const role of ['admin', 'member']) {
 test('Activity lists runs simply and opens one run into its details', async ({ page }) => {
   const app = await appFixture(page);
   app.archives = ['bean-0'];
+  app.activity = { sources: [
+    { roaster: 'Test Roaster', last_ok: '2020-01-01T00:00:00Z', status: 'waiting', attempt: 2, next_try: '2099-01-01T10:00:00Z', history: ['ok', 'fail', 'fail'] },
+    { roaster: 'Other Roaster', last_ok: new Date().toISOString(), status: 'ok', attempt: 0, history: ['ok', 'ok'] }] };
   app.runs = [
     { id: 3, started_at: new Date().toISOString(), source: 'scheduled', status: 'partial', scrape_status: 'partial', label_status: 'skipped', scrape_error: 'Test Roaster: HTTP Error 429', events: [],
       queue: [{ roaster: 'Test Roaster', status: 'waiting', reason: 'rate_limited', next_try: '2099-01-01T10:00:00Z', resolved: false }, { roaster: 'Other Roaster', status: 'ok', resolved: false }] },
@@ -34,12 +37,12 @@ test('Activity lists runs simply and opens one run into its details', async ({ p
   ];
   await app.open();
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
-  await expect(page.locator('#activity-plan')).toContainText('1 of 2 roasters done');
-  await expect(page.locator('#activity-plan .plan-steps li')).toHaveCount(2);
-  await expect(page.locator('#activity-plan .plan-steps li.next')).toContainText('2 of 2');
+  await expect(page.locator('#activity-sources')).toContainText('1 of 2 sources out of date');
+  await expect(page.locator('#activity-sources .src-row')).toHaveCount(2);
+  await expect(page.locator('#activity-sources .src-row').first()).toContainText('Paused');
   await expect(page.locator('#activity-list')).not.toContainText('HTTP Error 429');
   await expect(page.locator('.activity-row')).toHaveCount(2);
-  await expect(page.locator('.activity-row').nth(0)).toContainText('Retrying');
+  await expect(page.locator('.activity-row').nth(0)).toContainText('Incomplete');
   await expect(page.locator('.activity-row').nth(1)).toContainText('Manual · 1 new');
   await page.locator('.activity-row').nth(1).click();
   const detail = page.locator('#activity-detail');
@@ -53,7 +56,7 @@ test('Activity lists runs simply and opens one run into its details', async ({ p
   await detail.getByRole('button', { name: '‹ Activity' }).click();
   await expect(page.locator('#activity-main')).toBeVisible();
   await page.locator('.activity-row').nth(0).click();
-  await expect(detail).toContainText('Waiting, next try');
+  await expect(detail).toContainText('Not updated');
   await expect(detail).toContainText('Technical details');
   await page.goBack();
   await expect(page.locator('#activity-main')).toBeVisible();
@@ -70,8 +73,7 @@ test('Activity shows active refresh progress at narrow widths', async ({ page })
   await page.setViewportSize({ width: 320, height: 740 });
   await app.open(); await app.ready();
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
-  await expect(page.locator('#activity-plan')).toContainText('Refreshing now');
-  await expect(page.locator('#activity-plan')).toContainText('2 of 9 roasters checked');
+  await expect(page.locator('#activity-live')).toContainText('Refreshing now, 2 of 9 roasters checked');
   await page.locator('.activity-row').click();
   await expect(page.locator('#activity-detail')).toContainText('Scraping 2 of 9 roasters — Test Roaster');
   await expect(page.locator('#activity-detail')).toContainText('Processing 10 of 20 listings with Claude — batch 2 of 2');
@@ -79,4 +81,19 @@ test('Activity shows active refresh progress at narrow widths', async ({ page })
   await page.screenshot({ path: '/tmp/coffee-backlog-activity-light.png', fullPage: true });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ path: '/tmp/coffee-backlog-activity-dark.png', fullPage: true });
+});
+
+test('beans from an out-of-date source are marked and the Wish list slider hides them by level', async ({ page }) => {
+  const app = await appFixture(page);
+  app.activity = { sources: [{ roaster: 'Test Roaster', last_ok: '2020-01-01T00:00:00Z', status: 'ok', attempt: 0, history: ['ok'] }] };
+  await app.open(); await app.ready();
+  await expect(page.locator('#browse-health')).toContainText('1 of 1 sources out of date');
+  await expect(page.locator('.bean-card.stale-source .stale-badge').first()).toContainText('Source out of date');
+  await page.locator('#open-filters').click();
+  await page.locator('#filter-trusted').check();
+  await page.locator('#filter-apply').click();
+  await expect(page.locator('#bean-list .bean-card')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Wish list', exact: true }).click();
+  await page.locator('#wish-level').fill('0');
+  await expect(page.locator('#wish-ticks button.on')).toHaveCount(1);
 });
