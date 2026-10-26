@@ -1240,7 +1240,7 @@ function activityStages(run) {
   const listings = count => `${count || 0} listing${count === 1 ? '' : 's'}`;
   const processing = run.label_status === 'running'
     ? run.selected_count ? `Processing ${run.labeled_count || 0} of ${listings(run.selected_count)} with ${provider}${run.batch_index ? ` — batch ${run.batch_index} of ${run.batch_total}` : ''}` : 'Preparing listings for processing'
-    : run.label_status === 'success' ? `Processing successful — ${listings(run.labeled_count)} labeled by ${provider} — ${run.model_batches || 0} model ${run.model_batches === 1 ? 'batch' : 'batches'}`
+    : run.label_status === 'success' ? `Processing successful — ${listings(run.labeled_count)} labeled by ${provider}`
     : run.label_status === 'skipped' ? run.scrape_status === 'failed' ? 'Processing skipped because scraping failed' : 'Processing skipped — no listings needed labels'
     : run.label_status === 'partial' ? `Processing partially completed — ${run.labeled_count || 0} of ${listings(run.selected_count)} labeled by ${provider}`
     : run.label_status === 'failed' ? `Processing failed — ${listings(run.labeled_count)} labeled by ${provider}` : 'Processing waiting';
@@ -1322,11 +1322,13 @@ function renderActivityDetail(run, all) {
     group.append(list);
     parts.push(group);
   }
-  if (!run.legacy && run.scrape_status) {
+  if (run.status === 'running') {
     const group = node('section', 'detail-group');
-    group.append(node('h3', '', 'Progress'));
-    for (const line of activityStages(run).slice(plan ? 1 : 0)) group.append(node('p', '', line));
+    group.append(node('h3', '', 'Now'));
+    for (const line of activityStages(run)) group.append(node('p', '', line));
     parts.push(group);
+  } else if (run.labeled_count > 0) {
+    parts.push(node('p', 'detail-note', activityStages(run)[1].replace(/^Processing successful — /, '')));
   }
   const changes = runChanges(run);
   for (const kind of Object.keys(eventLabels)) {
@@ -1364,8 +1366,8 @@ function renderActivityDetail(run, all) {
     group.append(list);
     parts.push(group);
   }
-  const error = [run.scrape_error, run.label_error, run.error].filter(Boolean).join('\n');
-  if (error) {
+  const error = [...(run.legacy || run.status === 'running' ? [] : activityStages(run)), run.scrape_error, run.label_error, run.error].filter(Boolean).join('\n');
+  if (error && run.status !== 'running' && (run.legacy || ['partial', 'failed', 'interrupted'].includes(run.status))) {
     const group = node('details', 'detail-group');
     group.append(node('summary', '', 'Technical details'), node('p', 'run-error', error));
     parts.push(group);

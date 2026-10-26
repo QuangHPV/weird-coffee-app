@@ -47,7 +47,7 @@ test('Activity lists runs simply and opens one run into its details', async ({ p
   await page.locator('.activity-row').nth(1).click();
   const detail = page.locator('#activity-detail');
   await expect(page.locator('#activity-main')).toBeHidden();
-  await expect(detail).toContainText('11 listings labeled by Claude — 2 model batches');
+  await expect(detail).toContainText('11 listings labeled by Claude');
   await expect(detail).toContainText('Coffee 1');
   await expect(detail).not.toContainText('Other coffee');
   await expect(detail.locator('summary')).toHaveText('1 archived bean checked');

@@ -515,3 +515,5 @@ nav button.alert::after{content:"";position:absolute;top:12px;left:calc(50% + 10
 }
 .activity-live{margin:-6px 0 16px;padding:10px 14px;border-radius:6px;background:#e9f3ec;color:#2f6b46;font-size:.82rem;font-weight:700}
 @media(prefers-color-scheme:dark){.activity-live{background:#1a3121;color:#7ac498}}
+.detail-note{margin:0 2px 14px;font-size:.84rem;color:#6f635a}
+@media(prefers-color-scheme:dark){.detail-note{color:#b5a69a}}
