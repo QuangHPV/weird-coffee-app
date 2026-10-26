@@ -37,7 +37,7 @@ test('Activity lists runs simply and opens one run into its details', async ({ p
   ];
   await app.open();
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
-  await expect(page.locator('#activity-sources')).toContainText('1 of 2 sources out of date');
+  await expect(page.locator('#activity-sources')).toContainText('1 of 2 roasters out of date');
   await expect(page.locator('#activity-sources .src-row')).toHaveCount(2);
   await expect(page.locator('#activity-sources .src-row').first()).toContainText('Paused');
   await expect(page.locator('#activity-list')).not.toContainText('HTTP Error 429');
@@ -87,8 +87,8 @@ test('beans from an out-of-date source are marked and the Wish list slider hides
   const app = await appFixture(page);
   app.activity = { sources: [{ roaster: 'Test Roaster', last_ok: '2020-01-01T00:00:00Z', status: 'ok', attempt: 0, history: ['ok'] }] };
   await app.open(); await app.ready();
-  await expect(page.locator('#browse-health')).toContainText('1 of 1 sources out of date');
-  await expect(page.locator('.bean-card.stale-source .stale-badge').first()).toContainText('Source out of date');
+  await expect(page.locator('#browse-health')).toContainText('1 of 1 roasters out of date');
+  await expect(page.locator('.bean-card.stale-source .stale-badge').first()).toContainText('Roaster out of date');
   await page.locator('#open-filters').click();
   await page.locator('#filter-trusted').check();
   await page.locator('#filter-apply').click();

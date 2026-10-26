@@ -19,11 +19,11 @@ test('a source is up to date within a day and states follow failures and the sug
 test('the banner grows more serious as the oldest data ages', () => {
   const warn = healthSummary(sourceHealth([source('A', hours(2)), source('B', hours(30))], now));
   assert.equal(warn.tone, 'warn');
-  assert.equal(warn.title, '1 of 2 sources out of date');
+  assert.equal(warn.title, '1 of 2 roasters out of date');
   assert.equal(healthSummary(sourceHealth([source('B', hours(60))], now)).tone, 'down');
   assert.equal(healthSummary(sourceHealth([source('A', hours(2))], now)).tone, 'ok');
   const paused = healthSummary(sourceHealth([source('A', hours(2), 'waiting', new Date(now + 3600000).toISOString())], now));
-  assert.equal(paused.title, '1 of 1 sources paused');
+  assert.equal(paused.title, '1 of 1 roasters paused');
   assert.equal(paused.toScan.length, 1);
 });
 

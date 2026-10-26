@@ -43,11 +43,11 @@ export function healthSummary(list) {
   const paused = list.filter(source => source.locked);
   const toScan = list.filter(source => source.locked || !source.upToDate);
   const suggested = list.filter(source => source.state === 'suggested');
-  if (!stale.length && !paused.length) return { tone: 'ok', title: 'All sources up to date', detail: '', toScan, suggested };
+  if (!stale.length && !paused.length) return { tone: 'ok', title: 'All roasters up to date', detail: '', toScan, suggested };
   const oldest = stale.reduce((max, source) => Math.max(max, source.age ?? 7 * DAY), 0);
   return {
     tone: oldest >= 2 * DAY ? 'down' : 'warn',
-    title: stale.length ? `${stale.length} of ${list.length} sources out of date` : `${paused.length} of ${list.length} sources paused`,
+    title: stale.length ? `${stale.length} of ${list.length} roasters out of date` : `${paused.length} of ${list.length} roasters paused`,
     detail: stale.length ? `Oldest data is ${ageText(oldest)} old` : '',
     toScan, suggested,
   };

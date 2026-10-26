@@ -18,8 +18,10 @@ function stateText(source) {
 }
 
 // onScan is given only where scanning is possible (the Mac); the phone just shows the state.
-export function renderSourcePanel(box, sources, { now = Date.now(), onScan = null, scanning = false } = {}) {
+// onScan() scans the out of date roasters, onScan(names) scans the ticked ones. `selected` is a Set kept by the caller.
+export function renderSourcePanel(box, sources, { now = Date.now(), onScan = null, scanning = false, selected = new Set() } = {}) {
   const list = sourceHealth(sources, now);
+  for (const name of selected) if (!list.some(source => source.roaster === name)) selected.delete(name);
   box.hidden = !list.length;
   if (!list.length) return list;
   const summary = healthSummary(list);
@@ -29,13 +31,21 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
   const text = el('div', 'src-title');
   text.append(el('span', 'src-pulse'), el('strong', '', summary.title));
   if (summary.detail) text.append(el('span', 'src-detail', summary.detail));
-  head.append(text);
+  const actions = el('div', 'src-actions');
+  head.append(text, actions);
   if (onScan && summary.toScan.length) {
-    const button = el('button', `src-scan${summary.suggested.length ? ' suggested' : ''}`, `Scan ${summary.toScan.length} ${summary.toScan.length === 1 ? 'source' : 'sources'}`);
+    const button = el('button', `src-scan${summary.suggested.length ? ' suggested' : ''}`, `Scan ${summary.toScan.length} ${summary.toScan.length === 1 ? 'roaster' : 'roasters'}`);
     button.type = 'button';
     button.disabled = scanning;
-    button.onclick = onScan;
-    head.append(button);
+    button.onclick = () => onScan();
+    actions.append(button);
+  }
+  if (onScan && selected.size) {
+    const button = el('button', 'src-scan', `Scan selected (${selected.size})`);
+    button.type = 'button';
+    button.disabled = scanning;
+    button.onclick = () => onScan([...selected]);
+    actions.append(button);
   }
 
   const rows = el('ul', 'src-list');
@@ -46,6 +56,18 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
     for (const result of source.history.slice(-14)) strip.append(el('i', result));
     const meta = el('span', 'src-meta');
     meta.append(el('span', 'src-age', source.age == null ? 'Never read' : `Read ${ageText(source.age)} ago`), el('span', 'src-state', stateText(source)));
+    if (onScan) {
+      const pick = el('input', 'src-pick');
+      pick.type = 'checkbox';
+      pick.checked = selected.has(source.roaster);
+      pick.disabled = scanning;
+      pick.setAttribute('aria-label', `Select ${source.roaster}`);
+      pick.onchange = () => {
+        if (pick.checked) selected.add(source.roaster); else selected.delete(source.roaster);
+        renderSourcePanel(box, sources, { now, onScan, scanning, selected });
+      };
+      row.append(pick);
+    }
     row.append(el('span', 'src-dot'), el('span', 'src-name', source.roaster), strip, meta);
     rows.append(row);
   }

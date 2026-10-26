@@ -773,7 +773,7 @@ function beanCard(bean) {
       label.why?.roast, 'Roast', ROAST_LEVELS));
     card.append(top, meta, taste, footer);
   } else card.append(top, meta, footer);
-  if (stale) card.prepend(node('div', 'stale-badge', stale.age == null ? 'Source never read' : `Source out of date, read ${ageText(stale.age)} ago`));
+  if (stale) card.prepend(node('div', 'stale-badge', stale.age == null ? 'Roaster never read' : `Roaster out of date, read ${ageText(stale.age)} ago`));
   return card;
 }
 
