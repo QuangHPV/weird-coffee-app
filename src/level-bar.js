@@ -54,10 +54,10 @@ export function createLevelBar(box, labels, onChange, ariaLabel) {
     set(next);
     onChange(next);
   }
-  // The nearest divider to the pointer, never the left edge.
+  // The segment under the pointer: the marker moves to its right divider.
   const fromPointer = event => {
     const rect = track.getBoundingClientRect();
-    choose(Math.round(((event.clientX - rect.left) / rect.width) * count) - 1);
+    choose(Math.floor(((event.clientX - rect.left) / rect.width) * count));
   };
   track.onpointerdown = event => { track.setPointerCapture(event.pointerId); fromPointer(event); };
   track.onpointermove = event => { if (track.hasPointerCapture(event.pointerId)) fromPointer(event); };
