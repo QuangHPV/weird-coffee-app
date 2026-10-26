@@ -28,7 +28,7 @@ export function mountBacklog(root, adapter) {
           <button type="button" data-action="cancel-edit">Cancel</button></div></form>`
       : `<div class="backlog-title">${tagged(title)}</div>
         ${body ? `<div class="backlog-body">${tagged(body)}</div>` : ''}
-        ${task.author_name ? `<div class="backlog-author">By ${escapeText(task.author_name)}${task.request_id ? ' · Feature request' : ''}</div>` : ''}
+        ${task.author_name ? `<div class="backlog-author">By ${escapeText(task.author_name)}${task.request_id ? ', Feature request' : ''}</div>` : ''}
         ${time ? `<div class="backlog-time">${time}</div>` : ''}`;
     return `<li class="backlog-task ${done ? 'is-done' : ''}" data-id="${escapeText(task.id)}">
       <input type="checkbox" data-action="toggle" ${done ? 'checked' : ''} ${disabled() ? 'disabled' : ''}
