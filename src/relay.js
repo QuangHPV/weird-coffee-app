@@ -22,20 +22,41 @@ function trim(product) {
   return { title, handle, product_type, tags, variants, images: (images || []).slice(0, 1), body_html };
 }
 
+// Products the Mac would read a product page for: kept by the roaster's filters, with no description in the feed.
+function needsPage(roaster, product) {
+  const text = (product.body_html || '').replace(/<[^>]*>|&nbsp;/g, '').trim();
+  if (text || !product.variants?.length) return false;
+  if (roaster.types && !roaster.types.includes(product.product_type)) return false;
+  if (roaster.tags_any?.length && !roaster.tags_any.some(tag => (product.tags || []).includes(tag))) return false;
+  return !(roaster.skip || []).some(term => product.title.toLowerCase().includes(term.toLowerCase()));
+}
+
+// The Mac only reads text out of the page body, so scripts and styles can go.
+const slim = html => html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ');
+
 export async function readFeed(roaster, { fetchFn = (url) => fetch(url), wait = pause } = {}) {
   if (roaster.platform === 'squarespace') {
     const url = `${roaster.url}${roaster.path}?format=json-pretty`;
     return { [url]: await get(url, fetchFn) };
   }
-  const pages = {};
+  const pages = {}, all = [];
   for (let page = 1; ; page++) {
     const url = `${roaster.url}/products.json?limit=250&page=${page}`;
     const products = JSON.parse(await get(url, fetchFn)).products;
     if (!Array.isArray(products)) throw new FeedError('No product list');
     pages[url] = JSON.stringify({ products: products.map(trim) });
-    if (!products.length) return pages;
+    all.push(...products);
+    if (!products.length) break;
     await wait(PAUSE_MS);
   }
+  if (roaster.page_text) {
+    for (const product of all.filter(item => needsPage(roaster, item))) {
+      const url = `${roaster.url}/products/${product.handle}`;
+      pages[url] = slim(await get(url, fetchFn));
+      await wait(PAUSE_MS);
+    }
+  }
+  return pages;
 }
 
 // Reads and uploads one roaster at a time. A 429 stops everything, so the phone never pushes a throttled store.

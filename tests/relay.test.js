@@ -15,6 +15,22 @@ test('reads every page until an empty one and keeps only needed fields', async (
   assert.equal(first.extra, undefined);
 });
 
+test('reads product pages for lots with no description when the roaster needs page text', async () => {
+  const feed = { products: [
+    { title: 'Bare', handle: 'bare', product_type: 'Beans', tags: [], variants: [{}], body_html: ' <p>&nbsp;</p>' },
+    { title: 'Described', handle: 'described', product_type: 'Beans', tags: [], variants: [{}], body_html: '<p>Notes</p>' },
+    { title: 'Merch', handle: 'merch', product_type: 'Gear', tags: [], variants: [{}], body_html: '' },
+  ] };
+  const seen = [];
+  const pages = await readFeed({ ...shop, page_text: true, types: ['Beans'], skip: [] }, { wait, fetchFn: async url => {
+    seen.push(url);
+    const body = url.includes('/products/') ? '<p>Hi</p><script>x</script>' : url.endsWith('page=1') ? JSON.stringify(feed) : '{"products":[]}';
+    return { ok: true, text: async () => body };
+  } });
+  assert.deepEqual(seen.filter(url => url.includes('/products/')), ['https://shop.test/products/bare']);
+  assert.equal(pages['https://shop.test/products/bare'].includes('script'), false);
+});
+
 test('a 429 stops the relay and keeps what was already sent', async () => {
   const sent = [];
   const fetchFn = async url => url.startsWith('https://bad') ? { ok: false, status: 429 } : { ok: true, text: async () => '{"products":[]}' };

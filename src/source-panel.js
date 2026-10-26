@@ -19,7 +19,7 @@ function stateText(source) {
 
 // onScan is given only where scanning is possible (the Mac); the phone just shows the state.
 // onScan(null, names) scans the out of date roasters, onScan(names, names) the ticked ones. `selected` and `seen` are kept by the caller.
-export function renderSourcePanel(box, sources, { now = Date.now(), onScan = null, scanning = false, selected = new Set(), seen = new Map(), note = '' } = {}) {
+export function renderSourcePanel(box, sources, { now = Date.now(), onScan = null, scanning = false, selected = new Set(), seen = new Map(), note = '', onAlt = null } = {}) {
   const list = sourceHealth(sources, now);
   for (const name of selected) if (!list.some(source => source.roaster === name)) selected.delete(name);
   box.hidden = !list.length;
@@ -35,6 +35,9 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
   const early = list.filter(source => selected.has(source.roaster) && source.state === 'paused');
   const summary = healthSummary(list);
   box.dataset.tone = summary.tone;
+  // Red when nothing is up to date, green when everything is, with every shade between.
+  const share = list.filter(source => source.upToDate && !source.locked).length / list.length;
+  box.style.setProperty('--health', `hsl(${Math.round(share * 125)} 55% 42%)`);
 
   const head = el('div', 'src-head');
   const text = el('div', 'src-title');
@@ -47,6 +50,14 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
     button.type = 'button';
     button.disabled = scanning;
     button.onclick = () => onScan(null, summary.toScan.map(source => source.roaster));
+    actions.append(button);
+  }
+  if (onAlt && (selected.size || summary.toScan.length)) {
+    const names = selected.size ? [...selected] : summary.toScan.map(source => source.roaster);
+    const button = el('button', 'src-scan alt', 'Scan with Playwright');
+    button.type = 'button';
+    button.disabled = scanning;
+    button.onclick = () => onAlt(selected.size ? names : null);
     actions.append(button);
   }
   if (onScan && selected.size) {
@@ -77,7 +88,7 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
       row.onclick = () => {
         if (scanning) return;
         if (selected.has(source.roaster)) selected.delete(source.roaster); else selected.add(source.roaster);
-        renderSourcePanel(box, sources, { now, onScan, scanning, selected, seen, note });
+        renderSourcePanel(box, sources, { now, onScan, onAlt, scanning, selected, seen, note });
       };
       row.append(pick);
     }
