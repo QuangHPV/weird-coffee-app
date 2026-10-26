@@ -61,9 +61,13 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
       pick.type = 'checkbox';
       pick.checked = selected.has(source.roaster);
       pick.disabled = scanning;
-      pick.setAttribute('aria-label', `Select ${source.roaster}`);
-      pick.onchange = () => {
-        if (pick.checked) selected.add(source.roaster); else selected.delete(source.roaster);
+      pick.tabIndex = -1;
+      row.classList.add('pickable');
+      if (pick.checked) row.classList.add('picked');
+      row.title = 'Click to select';
+      row.onclick = () => {
+        if (scanning) return;
+        if (selected.has(source.roaster)) selected.delete(source.roaster); else selected.add(source.roaster);
         renderSourcePanel(box, sources, { now, onScan, scanning, selected });
       };
       row.append(pick);
