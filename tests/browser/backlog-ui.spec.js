@@ -94,6 +94,6 @@ test('beans from an out-of-date source are marked and the Wish list slider hides
   await page.locator('#filter-apply').click();
   await expect(page.locator('#bean-list .bean-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Wish list', exact: true }).click();
-  await page.locator('#wish-level').fill('0');
-  await expect(page.locator('#wish-ticks button.on')).toHaveCount(1);
+  await page.locator('#wish-bar .level-names button').first().click();
+  await expect(page.locator('#wish-bar .level-names button.on')).toHaveCount(1);
 });

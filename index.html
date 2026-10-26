@@ -75,7 +75,7 @@
       <section id="wishlist" aria-labelledby="wishlist-heading" hidden>
         <div class="section-heading"><div><span class="eyebrow">Saved</span><h2 id="wishlist-heading">Wish list <span id="wish-count"></span></h2></div>
         </div>
-        <div class="wish-trust"><input id="wish-level" type="range" min="0" max="2" step="1" aria-label="Wish list trust level"><div id="wish-ticks" class="wish-ticks"></div><span id="wish-hidden" class="muted"></span></div>
+        <div class="wish-trust"><div id="wish-bar"></div><span id="wish-hidden" class="muted"></span></div>
         <p id="wish-status" class="muted" role="status"></p>
         <ol id="wish-list" class="wish-list"></ol>
       </section>
@@ -114,7 +114,7 @@
           </div>
         </section>
         <section class="filter-section"><h3>Price per 100g: <span id="filter-price-label">any</span></h3><input id="filter-price" type="range" min="5" max="60" step="1" value="60" aria-label="Maximum price per 100g"></section>
-        <section class="filter-section filter-checks"><label><input id="filter-stock" type="checkbox" checked>In stock only</label><label><input id="filter-trusted" type="checkbox">Trusted lots only</label><label><input id="filter-archived" type="checkbox">Archived beans</label></section>
+        <section class="filter-section filter-checks"><label><input id="filter-stock" type="checkbox" checked>In stock only</label><label><input id="filter-trusted" type="checkbox">Surely in-stock lots only</label><label><input id="filter-archived" type="checkbox">Archived beans</label></section>
         <section class="filter-section"><h3>Roast</h3>
           <div id="filter-roast" class="roast-range"><div class="roast-slider"><div class="roast-track" aria-hidden="true"><div id="filter-roast-fill" class="roast-fill"></div></div><input id="filter-roast-min" type="range" min="0" max="2" step="1" value="0" aria-label="Minimum roast level"><input id="filter-roast-max" type="range" min="0" max="2" step="1" value="2" aria-label="Maximum roast level"></div><div class="roast-levels" aria-hidden="true"><span>Light</span><span>Medium</span><span>Dark</span></div><div id="filter-roast-selection" class="roast-selection">All roast levels</div></div>
           <label class="unknown-filter" data-hint='Lots that do not state their roast or funk stay in when you filter by them, marked "not stated".'><input id="filter-unknown" type="checkbox" checked>Include possible fits</label>

@@ -10,6 +10,7 @@ import { createAccountCache } from './account-cache.js';
 import { rowMark, runPlan, staleRoasters, wishShows, WISH_LEVELS, healthSummary, sourceHealth, ageText } from './activity-model.js';
 import { renderSourcePanel } from './source-panel.js';
 import { relayRoasters } from './relay.js';
+import { createLevelBar } from './level-bar.js';
 
 const $ = id => document.getElementById(id);
 mountAppShell();
@@ -983,10 +984,7 @@ function shownWishIds(byId) {
 }
 
 function renderWishLevel() {
-  $('wish-level').value = wishLevel;
-  $('wish-level').style.setProperty('--fill', `${wishLevel * 50}%`);
-  $('wish-level').setAttribute('aria-valuetext', WISH_LEVELS[wishLevel]);
-  document.querySelectorAll('#wish-ticks button').forEach((button, index) => button.classList.toggle('on', index <= wishLevel));
+  wishBar.set(wishLevel);
 }
 
 // Put a new order of the shown beans back into the full list; hidden beans stay where they are.
@@ -996,18 +994,12 @@ function mergeShownOrder(order) {
   return ranking.ids.map(id => shown.has(id) ? order[next++] : id);
 }
 
+const wishBar = createLevelBar($('wish-bar'), WISH_LEVELS, level => setWishLevel(level), 'Wish list lots shown');
 function setWishLevel(level) {
   wishLevel = level;
   try { localStorage.setItem('wishTrustLevel', String(level)); } catch {}
   renderWishlist();
 }
-$('wish-level').oninput = event => setWishLevel(Number(event.target.value));
-$('wish-ticks').replaceChildren(...WISH_LEVELS.map((name, index) => {
-  const button = node('button', '', name);
-  button.type = 'button';
-  button.onclick = () => setWishLevel(index);
-  return button;
-}));
 
 let pendingWishDrag = null;
 let activeWishDrag = null;

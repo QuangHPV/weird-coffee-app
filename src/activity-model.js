@@ -59,7 +59,7 @@ export function staleRoasters(sources, now = Date.now()) {
 }
 
 // Wish list slider: each step also shows everything the one before it shows.
-export const WISH_LEVELS = ['Trusted', '+ Sold out', 'Everything'];
+export const WISH_LEVELS = ['Surely in-stock', '+ Sold out', 'Everything'];
 
 export function wishShows(bean, level, stale) {
   if (!bean) return true;
