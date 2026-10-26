@@ -479,6 +479,13 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .src-state{grid-area:state;font-size:.74rem;font-weight:700;color:#3f8a5a;text-align:right}
 .src-row.old .src-state{color:#9a6a1c}.src-row.paused .src-state{color:#b3403a}.src-row.suggested .src-state{color:#2f6fb0}
 .src-row.stale .src-name{color:#6a5b52}
+.src-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.src-scan.early{background:#b3403a}.src-scan:disabled{opacity:.45}
+.src-warn,.src-note{margin:0;padding:10px 16px;font-size:.8rem;font-weight:700;border-top:1px solid #0000001a}
+.src-warn{color:#b3403a;background:#b3403a14}.src-note{color:#6f635a}
+.src-row.pickable{cursor:pointer;grid-template-columns:16px 10px minmax(0,1fr) auto;grid-template-areas:"pick dot name age" "pick dot strip state"}
+.src-row.picked{background:#794a2a1f;box-shadow:inset 4px 0 0 #794a2a}
+.src-pick{grid-area:pick;margin:0;accent-color:#794a2a;pointer-events:none;opacity:.4}.src-row.picked .src-pick{opacity:1}
 .browse-health{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:10px 12px;border-radius:6px;border:1px solid #ecd9bb;background:#fbf3e6;color:#5c4627;text-align:left;font-weight:700;font-size:.82rem}
 .browse-health[data-tone=down]{background:#fbeceb;border-color:#e8bcb7;color:#7e2f29}
 .browse-health-go{margin-left:auto;font-weight:600;white-space:nowrap}
@@ -502,7 +509,7 @@ nav button.alert::after{content:"";position:absolute;top:12px;left:calc(50% + 10
   .sources{background:#221b16;border-color:#413426}
   .sources[data-tone=warn]{background:#2c2114;border-color:#5a4429}
   .sources[data-tone=down]{background:#2f1816;border-color:#6a2d28}
-  .src-detail,.src-age{color:#b5a69a}
+  .src-detail,.src-age,.src-note{color:#b5a69a}.src-warn{color:#e0857d}.src-row.picked{background:#c99b7d26;box-shadow:inset 4px 0 0 #c99b7d}.src-pick{accent-color:#c99b7d}
   .src-list{border-color:#ffffff1a}.src-row+.src-row{border-color:#ffffff12}
   .src-row.stale .src-name{color:#c9b9ad}
   .src-state{color:#7ac498}.src-row.old .src-state{color:#d2a77f}.src-row.paused .src-state{color:#e0857d}.src-row.suggested .src-state{color:#7ab3ea}

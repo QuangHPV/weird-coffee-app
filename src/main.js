@@ -9,6 +9,7 @@ import { startReleaseUpdates } from './release-updates.js';
 import { createAccountCache } from './account-cache.js';
 import { rowMark, runPlan, staleRoasters, wishShows, WISH_LEVELS, healthSummary, sourceHealth, ageText } from './activity-model.js';
 import { renderSourcePanel } from './source-panel.js';
+import { relayRoasters } from './relay.js';
 
 const $ = id => document.getElementById(id);
 mountAppShell();
@@ -1374,12 +1375,35 @@ function renderActivityDetail(run, all) {
   }
   detail.replaceChildren(...parts);
 }
+// The admin's phone reads the stores itself and hands the feeds to the Mac through Neon.
+const phoneRelay = { busy: false, note: '', selected: new Set(), seen: new Map() };
+async function relayFromPhone(sources, names) {
+  if (phoneRelay.busy) return;
+  const chosen = sources.filter(source => names.includes(source.roaster));
+  phoneRelay.busy = true;
+  const upload = async (roaster, pages) => {
+    const result = await client.rpc('upload_feed', { roaster_name: roaster, feed_pages: pages });
+    if (result.error) throw result.error;
+  };
+  const result = await relayRoasters(chosen, upload, {
+    onProgress: (name, index, total) => { phoneRelay.note = `Reading ${name} (${index + 1} of ${total})`; renderActivity(); },
+  });
+  phoneRelay.busy = false;
+  phoneRelay.selected.clear();
+  phoneRelay.note = result.failed
+    ? `Stopped at ${result.failed}, ${result.reason}. ${result.done.length} sent to the Mac.`
+    : `${result.done.length} sent to the Mac, which will scan them shortly.`;
+  renderActivity();
+}
 function renderActivity() {
   if (!snapshot) return;
   const all = snapshot.runs || [];
   const current = all.find(run => run.status === 'running');
   refreshTrust();
-  renderSourcePanel($('activity-sources'), snapshot.activity?.sources || []);
+  const sources = snapshot.activity?.sources || [];
+  renderSourcePanel($('activity-sources'), sources, profile?.role === 'admin' && client
+    ? { onScan: (names, fallback) => relayFromPhone(sources, names || fallback), scanning: phoneRelay.busy, selected: phoneRelay.selected, seen: phoneRelay.seen, note: phoneRelay.note }
+    : {});
   $('activity-live').hidden = !current;
   if (current) $('activity-live').textContent = `Refreshing now, ${current.roasters_done || 0} of ${current.roasters_total || '?'} roasters checked`;
   const open = activityDetailId === null ? null : all.find(run => run.id === activityDetailId);

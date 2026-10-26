@@ -18,8 +18,8 @@ function stateText(source) {
 }
 
 // onScan is given only where scanning is possible (the Mac); the phone just shows the state.
-// onScan() scans the out of date roasters, onScan(names) scans the ticked ones. `selected` is a Set kept by the caller.
-export function renderSourcePanel(box, sources, { now = Date.now(), onScan = null, scanning = false, selected = new Set(), seen = new Map() } = {}) {
+// onScan(null, names) scans the out of date roasters, onScan(names, names) the ticked ones. `selected` and `seen` are kept by the caller.
+export function renderSourcePanel(box, sources, { now = Date.now(), onScan = null, scanning = false, selected = new Set(), seen = new Map(), note = '' } = {}) {
   const list = sourceHealth(sources, now);
   for (const name of selected) if (!list.some(source => source.roaster === name)) selected.delete(name);
   box.hidden = !list.length;
@@ -46,14 +46,14 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
     const button = el('button', `src-scan${summary.suggested.length ? ' suggested' : ''}`, `Scan ${summary.toScan.length} ${summary.toScan.length === 1 ? 'roaster' : 'roasters'}`);
     button.type = 'button';
     button.disabled = scanning;
-    button.onclick = () => onScan();
+    button.onclick = () => onScan(null, summary.toScan.map(source => source.roaster));
     actions.append(button);
   }
   if (onScan && selected.size) {
     const button = el('button', `src-scan${early.length ? ' early' : ''}`, `Scan selected (${selected.size})`);
     button.type = 'button';
     button.disabled = scanning;
-    button.onclick = () => onScan([...selected]);
+    button.onclick = () => onScan([...selected], [...selected]);
     actions.append(button);
   }
 
@@ -77,7 +77,7 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
       row.onclick = () => {
         if (scanning) return;
         if (selected.has(source.roaster)) selected.delete(source.roaster); else selected.add(source.roaster);
-        renderSourcePanel(box, sources, { now, onScan, scanning, selected, seen });
+        renderSourcePanel(box, sources, { now, onScan, scanning, selected, seen, note });
       };
       row.append(pick);
     }
@@ -85,6 +85,7 @@ export function renderSourcePanel(box, sources, { now = Date.now(), onScan = nul
     rows.append(row);
   }
   const warn = early.length ? el('p', 'src-warn', `Too early for ${early.map(source => source.roaster).join(', ')}. Scanning now may get throttled again.`) : null;
-  box.replaceChildren(...[head, warn, rows].filter(Boolean));
+  const status = note ? el('p', 'src-note', note) : null;
+  box.replaceChildren(...[head, warn, status, rows].filter(Boolean));
   return list;
 }
