@@ -3,7 +3,7 @@ import { createAccountClient } from './account-client.js';
 import { createDataLoader, LoadError, readResult } from './data-loader.js';
 import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
-import { typing, restoreDrafts, saveSpot, takeSpot } from './live-update.js';
+import { typing, restoreDrafts, saveSpot, takeSpot, showToast } from './live-update.js';
 import { mountPushPrompt } from './push.js';
 import { getTheme, setTheme, startTheme } from './theme.js';
 import { startReleaseUpdates } from './release-updates.js';
@@ -1272,7 +1272,23 @@ function closeActivityDetail(fromHistory = false) {
   if (!fromHistory && history.state?.activityDetail !== undefined) history.back();
   renderActivity();
 }
-window.addEventListener('popstate', () => { if (activityDetailId !== null) closeActivityDetail(true); });
+// Back (our swipe or the phone's gesture). Open overlays close first; at the first entry we ask before leaving.
+let leaving = false;
+function showExit(open) { $('exit-overlay').hidden = !open; if (open) $('exit-cancel').focus(); }
+window.addEventListener('popstate', () => {
+  if (leaving) { history.back(); return; }
+  const state = history.state;
+  if (!$('exit-overlay').hidden) { showExit(false); history.pushState({ view }, ''); return; }
+  if (!$('filter-overlay').hidden) { closeFilters(); history.pushState({ view }, ''); return; }
+  if (activityDetailId !== null) { closeActivityDetail(true); return; }
+  if (state?.view) { setView(state.view, true); return; }
+  history.pushState({ view }, '');
+  showExit(true);
+});
+$('exit-cancel').onclick = () => showExit(false);
+$('exit-confirm').onclick = () => { leaving = true; history.go(-2); };
+history.replaceState({ root: true }, '');
+history.pushState({ view }, '');
 function renderActivityRows(all, visible, current) {
   const rows = visible.map((run, index) => {
     const row = node('button', 'activity-row');
@@ -1421,6 +1437,7 @@ function renderRequests() {
       node('time', '', date(item.completed_at || item.created_at)));
     const [title, ...body] = item.text.split('\n');
     card.append(head, node('h3', '', title));
+    if (item.merged_title && item.status !== 'completed') card.append(node('p', 'request-merged', `Part of: ${item.merged_title}`));
     if (body.length) card.append(node('p', '', body.join('\n')));
     return card;
   }));
@@ -1463,10 +1480,15 @@ function refreshBacklogView() {
 }
 
 const VIEWS = ['browse', 'wishlist', 'activity', 'backlog', 'settings-roasters', 'settings-notifications'];
-// Views left behind, most recent last. A swipe right goes back to the latest one.
-const viewStack = [];
+// Each view change is a history entry, so the phone's back gesture and our swipe both return to the latest earlier view.
+// The first entry is a sentinel: going back onto it asks before leaving the app.
+let replacedDetail = false;
 function setView(next, fromBack = false) {
-  if (!fromBack && next !== view) { viewStack.push(view); if (viewStack.length > 20) viewStack.shift(); }
+  replacedDetail = false;
+  if (!fromBack && next !== view) {
+    if (activityDetailId !== null && history.state?.activityDetail !== undefined) { history.replaceState({ view: next }, ''); replacedDetail = true; }
+    else history.pushState({ view: next }, '');
+  }
   view = next;
   for (const name of VIEWS) $(name).hidden = showingSetup || name !== view;
   document.querySelectorAll('nav button').forEach(button => {
@@ -1475,7 +1497,7 @@ function setView(next, fromBack = false) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  if (activityDetailId !== null) { activityDetailId = null; if (history.state?.activityDetail !== undefined) history.back(); renderActivity(); }
+  if (activityDetailId !== null) { activityDetailId = null; if (!replacedDetail && history.state?.activityDetail !== undefined) history.back(); renderActivity(); }
   window.scrollTo(0, 0);
   if (view === 'backlog') refreshBacklogView();
 }
@@ -1496,8 +1518,7 @@ window.addEventListener('touchend', event => {
   const quick = event.timeStamp - swipe.time < 700;
   swipe = null;
   if (!quick || dx < 80 || dx < dy * 1.8 || showingSetup || !$('filter-overlay').hidden) return;
-  if (activityDetailId !== null) closeActivityDetail();
-  else if (viewStack.length) setView(viewStack.pop(), true);
+  history.back();
 });
 window.addEventListener('touchmove', event => { if (swipe && Math.abs(event.touches[0].clientY - swipe.y) > 40) swipe = null; }, { passive: true });
 function openFilters() {
@@ -1673,8 +1694,11 @@ async function renderNotifySettings() {
   box.disabled = false;
   box.checked = await pushPrompt.isOn().catch(() => false);
 }
-// A web page cannot open system settings directly; on Android this opens Chrome's notification settings.
-$('open-system-settings').onclick = () => { location.href = 'intent:#Intent;action=android.settings.APP_NOTIFICATION_SETTINGS;S.android.provider.extra.APP_PACKAGE=com.android.chrome;end'; };
+// A web page cannot open system settings (Chrome only launches activities that accept links, and Settings does not), so this shows where to go.
+$('open-system-settings').onclick = () => {
+  const toast = showToast('Settings > Apps > Another Cup > Notifications');
+  setTimeout(toast.close, 8000);
+};
 $('notify-toggle').onchange = async () => {
   const box = $('notify-toggle');
   box.disabled = true;

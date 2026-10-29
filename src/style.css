@@ -527,7 +527,7 @@ nav button.alert::after{content:"";position:absolute;top:12px;left:calc(50% + 10
 /* Fullscreen has no status bar: the header sits just below the camera cutout, never less than 28px from the top. */
 .topbar { padding-top: max(env(safe-area-inset-top), 28px); padding-bottom: 10px; }
 #settings.tour-focus { z-index: 4; }
-#settings-roasters-save { display: block; min-width: 160px; margin: 22px auto 0; padding: 0 36px; }
+#settings-roasters-save { display: block; margin: 22px auto 0; padding: 0 22px; }
 
 /* Settings menu and its two views. */
 .settings-wrap { position: relative; }
@@ -559,3 +559,13 @@ nav button.alert::after{content:"";position:absolute;top:12px;left:calc(50% + 10
   .switch-row input { background: #4b3d2d; }
   .switch-row input:checked { background: #b07850; }
 }
+.request-merged { margin: 4px 0 0; font-size: .78rem; font-weight: 700; color: #81532e; }
+@media (prefers-color-scheme: dark) { .request-merged { color: #c99b7d; } }
+
+.exit-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 24px; background: #21180fa6; }
+.exit-dialog { width: min(100%, 320px); padding: 22px; border-radius: 10px; background: #fffdfa; color: #30251e; box-shadow: 0 18px 50px #21180f55; }
+.exit-dialog h2 { margin: 0 0 18px; font-size: 1.1rem; }
+.exit-dialog div { display: flex; justify-content: flex-end; gap: 10px; }
+.exit-dialog button { min-height: 42px; padding: 0 18px; border: 1px solid #ddcfc0; border-radius: 6px; background: transparent; color: inherit; font-weight: 700; }
+.exit-dialog .primary { border-color: transparent; background: #794a2a; color: #fff; }
+@media (prefers-color-scheme: dark) { .exit-dialog { background: #221b16; color: #d1c3ba; } .exit-dialog button { border-color: #4b3d2d; } .exit-dialog .primary { background: #b07850; color: #141414; } }

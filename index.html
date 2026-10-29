@@ -153,6 +153,12 @@
     <span id="tour-count" class="eyebrow"></span><h3 id="tour-title"></h3><p id="tour-copy"></p>
     <div><button id="tour-skip" type="button">Skip guide</button><button id="tour-next" class="primary" type="button"></button></div>
   </aside>
+  <div id="exit-overlay" class="exit-overlay" hidden>
+    <section class="exit-dialog" role="alertdialog" aria-modal="true" aria-labelledby="exit-title">
+      <h2 id="exit-title">Exit Another Cup?</h2>
+      <div><button id="exit-cancel" type="button">Cancel</button><button id="exit-confirm" class="primary" type="button">Exit</button></div>
+    </section>
+  </div>
   <nav id="navigation" aria-label="Main navigation" hidden>
     <button class="active" data-view="browse" type="button" aria-label="Browse" aria-current="page">
       <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">

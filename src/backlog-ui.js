@@ -14,6 +14,11 @@ export function mountBacklog(root, adapter) {
   let confirming = null;                 // id of the task whose delete confirmation is open
   let editing = null, editDraft = '';    // id and text of the TODO being edited
   const disabled = () => busy || loading || state?.synced === false;
+  // The short title of the task another one was merged into (text before a colon, no #tags).
+  const mergedTitle = id => {
+    const target = state?.document.tasks.find(value => value.id === id);
+    return target ? splitMessage(target.text).title.split(':')[0].replace(/#[\p{L}\p{N}_-]+/gu, '').trim() : 'a removed task';
+  };
 
   function renderTask(task, field) {
     const { title, body } = splitMessage(task.text);
@@ -27,6 +32,7 @@ export function mountBacklog(root, adapter) {
       : `<div class="backlog-title">${tagged(title)}</div>
         ${body ? `<div class="backlog-body">${tagged(body)}</div>` : ''}
         ${task.author_name ? `<div class="backlog-author">By ${escapeText(task.author_name)}${task.request_id ? ', Feature request' : ''}</div>` : ''}
+        ${task.merged_into ? `<div class="backlog-merged">Merged into: ${escapeText(mergedTitle(task.merged_into))}</div>` : ''}
         ${time ? `<div class="backlog-time">${time}</div>` : ''}`;
     return `<li class="backlog-task ${done ? 'is-done' : ''}" data-id="${escapeText(task.id)}">
       <input type="checkbox" data-action="toggle" ${done ? 'checked' : ''} ${disabled() ? 'disabled' : ''}

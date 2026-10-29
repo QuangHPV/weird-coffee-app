@@ -39,3 +39,20 @@ test('notification toggle removes and restores the subscription', async ({ page 
   await expect(page.locator('#notify-toggle')).toBeChecked();
   expect(app.calls.save_push_subscription).toBe(2);
 });
+
+test('back returns through views, then asks before leaving', async ({ page }) => {
+  const app = await appFixture(page);
+  await app.open(); await app.ready();
+  await page.locator('#settings').click();
+  await page.locator('#open-roasters').click();
+  await expect(page.locator('#settings-roasters')).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('#browse')).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('#exit-overlay')).toBeVisible();
+  await page.locator('#exit-cancel').click();
+  await expect(page.locator('#exit-overlay')).toBeHidden();
+  await expect(page.locator('#browse')).toBeVisible();
+  await swipeRight(page);
+  await expect(page.locator('#exit-overlay')).toBeVisible();
+});

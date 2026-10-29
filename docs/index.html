@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta name="app-release" content="e02195434c2fb94d2ec7">
+  <meta name="app-release" content="8dbcd0777b8ade7b758f">
   <meta charset="utf-8">
   <style>
     html{background:#f7f3ed;color:#292019;font-family:system-ui,sans-serif}body{margin:0}button,input,textarea{font:inherit}[hidden]{display:none!important}
@@ -30,8 +30,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-F4EdMCTe.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CeDeaMBg.css">
+  <script type="module" crossorigin src="./assets/index-DKGqXxZ2.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DMqExE2c.css">
 </head>
 <body>
   <header class="topbar">
@@ -155,6 +155,12 @@
     <span id="tour-count" class="eyebrow"></span><h3 id="tour-title"></h3><p id="tour-copy"></p>
     <div><button id="tour-skip" type="button">Skip guide</button><button id="tour-next" class="primary" type="button"></button></div>
   </aside>
+  <div id="exit-overlay" class="exit-overlay" hidden>
+    <section class="exit-dialog" role="alertdialog" aria-modal="true" aria-labelledby="exit-title">
+      <h2 id="exit-title">Exit Another Cup?</h2>
+      <div><button id="exit-cancel" type="button">Cancel</button><button id="exit-confirm" class="primary" type="button">Exit</button></div>
+    </section>
+  </div>
   <nav id="navigation" aria-label="Main navigation" hidden>
     <button class="active" data-view="browse" type="button" aria-label="Browse" aria-current="page">
       <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
