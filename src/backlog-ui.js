@@ -8,13 +8,11 @@ const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V
 const dayLabel = day => new Date(`${day}T00:00:00`).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
 const timeLabel = stamp => hasTime(stamp) ? new Date(stamp).toLocaleTimeString('en-SG', { hour: 'numeric', minute: '2-digit' }) : '';
 const toState = result => ({ ...result, document: normalizeDocument(result.document), revision: Number(result.revision) });
-const DOUBLE_CLICK_MS = 400;
 
 export function mountBacklog(root, adapter) {
   let state = null, tab = 'todo', busy = false, loading = false, message = '', draft = '';
   let confirming = null;                 // id of the task whose delete confirmation is open
   let editing = null, editDraft = '';    // id and text of the TODO being edited
-  let lastClick = { id: null, time: 0 };
   const disabled = () => busy || loading || state?.synced === false;
 
   function renderTask(task, field) {
@@ -178,14 +176,11 @@ export function mountBacklog(root, adapter) {
       confirming = null;
       mutate(tasks => { const index = tasks.findIndex(task => task.id === id); if (index >= 0) tasks.splice(index, 1); });
     } else if (!action) {
-      // Two clicks (or taps) within 400 ms on an open TODO's text start editing.
+      // One click or tap on an open TODO's text edits it in place (not while selecting text to copy).
       const text = event.target.closest('.backlog-text.can-edit');
       const id = text?.closest('.backlog-task').dataset.id;
-      if (!id || editing === id || event.target.closest('form')) return;
-      if (lastClick.id === id && event.timeStamp - lastClick.time < DOUBLE_CLICK_MS) {
-        lastClick = { id: null, time: 0 };
-        startEdit(id);
-      } else lastClick = { id, time: event.timeStamp };
+      if (!id || editing === id || event.target.closest('form') || getSelection().toString()) return;
+      startEdit(id);
     }
   });
   // Clicks outside the backlog close an open delete confirmation.

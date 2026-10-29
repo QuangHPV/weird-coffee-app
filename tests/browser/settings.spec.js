@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { appFixture, pushFixture } from './fixture.js';
+import { appFixture, pushFixture, swipeRight } from './fixture.js';
 
 test('settings menu: theme, roasters, notifications, sign out', async ({ page }) => {
   const app = await appFixture(page);
@@ -17,7 +17,7 @@ test('settings menu: theme, roasters, notifications, sign out', async ({ page })
   await expect(page.locator('#settings-roasters')).toBeVisible();
   await expect(page.locator('#settings-roasters-list input').first()).toBeVisible();
   await page.screenshot({ path: '/tmp/settings-roasters.png' });
-  await page.locator('#settings-roasters [data-back]').click();
+  await swipeRight(page);
   await expect(page.locator('#browse')).toBeVisible();
   await page.locator('#settings').click();
   await page.locator('#open-notifications').click();

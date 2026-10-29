@@ -31,7 +31,7 @@
 .backlog-trash svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .backlog-trash:hover:not(:disabled),.backlog-trash.armed{color:var(--no,#a43f3f);background:color-mix(in srgb,var(--no,#a43f3f) 10%,transparent)}
 .backlog-empty{margin:0;padding:26px;border:1px dashed var(--line,#ddd0c4);border-radius:5px;text-align:center;color:var(--muted,#786c63);font-size:13px}
-.backlog-text.can-edit{touch-action:manipulation}
+.backlog-text.can-edit{touch-action:manipulation;cursor:text}
 .backlog-edit textarea{display:block;width:100%;box-sizing:border-box;resize:none;overflow:hidden;max-height:260px;background:var(--bg,var(--panel,#fff));color:inherit;border:1px solid var(--accent,#8d543e);border-radius:4px;padding:8px 10px;font:inherit;font-size:14px;line-height:1.45}
 .backlog-edit-actions{display:flex;gap:8px;margin-top:8px}
 .backlog-edit-actions button{border:1px solid var(--line,#ddd0c4);border-radius:4px;padding:6px 13px;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:650}

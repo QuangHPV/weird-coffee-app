@@ -1293,13 +1293,10 @@ function renderActivityRows(all, visible, current) {
 function renderActivityDetail(run, all) {
   const detail = $('activity-detail');
   const beans = new Map(snapshot.beans.map(bean => [bean.id, bean]));
-  const back = node('button', 'detail-back', '‹ Activity');
-  back.type = 'button';
-  back.onclick = () => closeActivityDetail();
   const head = node('header', 'detail-head');
   head.append(node('h2', '', activityDay(run.started_at || run.finished_at)),
     node('span', 'muted', `${runSource(run)} refresh${run.status === 'running' ? ' — in progress' : ''}`));
-  const parts = [back, head];
+  const parts = [head];
 
   const plan = runPlan(run);
   if (plan) {
@@ -1466,7 +1463,10 @@ function refreshBacklogView() {
 }
 
 const VIEWS = ['browse', 'wishlist', 'activity', 'backlog', 'settings-roasters', 'settings-notifications'];
-function setView(next) {
+// Views left behind, most recent last. A swipe right goes back to the latest one.
+const viewStack = [];
+function setView(next, fromBack = false) {
+  if (!fromBack && next !== view) { viewStack.push(view); if (viewStack.length > 20) viewStack.shift(); }
   view = next;
   for (const name of VIEWS) $(name).hidden = showingSetup || name !== view;
   document.querySelectorAll('nav button').forEach(button => {
@@ -1482,6 +1482,24 @@ function setView(next) {
 
 document.querySelectorAll('nav button').forEach(button => button.onclick = () => setView(button.dataset.view));
 $('browse-health').onclick = () => setView('activity');
+
+// Swipe right anywhere goes back: out of an Activity run's details, else to the latest earlier view.
+let swipe = null;
+const SWIPE_SKIP = 'input, textarea, select, [role=slider], .roast-slider, .level-bar, .wish-item, .filter-overlay, .feature-tour';
+window.addEventListener('touchstart', event => {
+  const touch = event.touches[0];
+  swipe = event.touches.length === 1 && !event.target.closest(SWIPE_SKIP) ? { x: touch.clientX, y: touch.clientY, time: event.timeStamp } : null;
+}, { passive: true });
+window.addEventListener('touchend', event => {
+  if (!swipe) return;
+  const touch = event.changedTouches[0], dx = touch.clientX - swipe.x, dy = Math.abs(touch.clientY - swipe.y);
+  const quick = event.timeStamp - swipe.time < 700;
+  swipe = null;
+  if (!quick || dx < 80 || dx < dy * 1.8 || showingSetup || !$('filter-overlay').hidden) return;
+  if (activityDetailId !== null) closeActivityDetail();
+  else if (viewStack.length) setView(viewStack.pop(), true);
+});
+window.addEventListener('touchmove', event => { if (swipe && Math.abs(event.touches[0].clientY - swipe.y) > 40) swipe = null; }, { passive: true });
 function openFilters() {
   cancelAccountLoad();
   draftFilters = cloneFilters(appliedFilters);
@@ -1605,13 +1623,10 @@ menu.querySelectorAll('[data-theme]').forEach(button => button.onclick = () => {
   setTheme(button.dataset.theme);
   menu.querySelectorAll('[data-theme]').forEach(other => other.setAttribute('aria-pressed', String(other === button)));
 });
-let returnView = 'browse';
 function openSettingsView(name) {
-  if (!view.startsWith('settings-')) returnView = view;
   setView(name);
   if (name === 'settings-roasters') renderRosterSettings(); else renderNotifySettings();
 }
-document.querySelectorAll('[data-back]').forEach(button => button.onclick = () => setView(returnView));
 $('open-roasters').onclick = () => { toggleMenu(false); openSettingsView('settings-roasters'); };
 $('open-notifications').onclick = () => { toggleMenu(false); openSettingsView('settings-notifications'); };
 

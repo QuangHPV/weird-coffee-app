@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { appFixture } from './fixture.js';
+import { appFixture, swipeRight } from './fixture.js';
 
 for (const role of ['admin', 'member']) {
   test(`${role} can archive and restore with accessible icons`, async ({ page }) => {
@@ -53,7 +53,7 @@ test('Activity lists runs simply and opens one run into its details', async ({ p
   await expect(detail.locator('summary')).toHaveText('1 archived bean checked');
   await detail.locator('summary').click();
   await expect(detail).toContainText('Coffee 1');
-  await detail.getByRole('button', { name: '‹ Activity' }).click();
+  await swipeRight(page);
   await expect(page.locator('#activity-main')).toBeVisible();
   await page.locator('.activity-row').nth(0).click();
   await expect(detail).toContainText('Not updated');

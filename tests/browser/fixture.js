@@ -73,3 +73,15 @@ export async function pushFixture(page, { permission = 'default', installed = tr
     Object.defineProperty(navigator, 'permissions', { configurable: true, value: { query: async () => ({ addEventListener: (_, fn) => listeners.push(fn) }) } });
   }, { permission, installed, supported, displayMode });
 }
+
+// A quick right swipe, as the app's go-back gesture.
+export async function swipeRight(page) {
+  await page.evaluate(() => {
+    const target = document.querySelector('main');
+    const touch = (x, y) => new Touch({ identifier: 1, target, clientX: x, clientY: y });
+    const send = (type, x, y) => target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true,
+      touches: type === 'touchend' ? [] : [touch(x, y)], changedTouches: [touch(x, y)] }));
+    send('touchstart', 60, 300);
+    send('touchend', 230, 305);
+  });
+}
