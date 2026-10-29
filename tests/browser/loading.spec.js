@@ -120,7 +120,7 @@ test('sign out cancels an outstanding load', async ({ page }) => {
   };
   await app.resume();
   await expect.poll(() => app.calls.app_snapshot).toBe(2);
-  await page.locator('#signout').click();
+  await page.locator('#settings').click(); await page.locator('#signout').click();
   await expect(page.locator('#auth')).toBeVisible();
   release();
   await expect(page.locator('#app')).toBeHidden();

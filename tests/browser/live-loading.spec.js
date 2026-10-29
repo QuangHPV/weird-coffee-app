@@ -85,7 +85,7 @@ test('sign out clears persistent cache and hides another open tab', async ({ pag
   const app = await appFixture(page); await app.open(); await app.ready(); await cached(page);
   const second = await context.newPage(); const other = await appFixture(second); await other.open(); await other.ready();
   app.signedIn = false;
-  await second.locator('#signout').click();
+  await second.locator('#settings').click(); await second.locator('#signout').click();
   await expect(page.locator('#app')).toBeHidden();
   await expect(second.locator('#app')).toBeHidden();
   expect(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('anotherCupAccount:')))).toBe(false);

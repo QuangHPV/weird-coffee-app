@@ -2,11 +2,13 @@
 const PUBLIC_KEY = 'BLVGIvMofzJ77lp075pS_CECunORrkdd3Jhq3-T8vRR7PKRD_SpEVcqrdy3JvrGjLcGgOAf9NRUwyrRr77a_LTM';
 const ASKED = 'anotherCupNotificationsAsked';
 const INSTALLED = 'anotherCupInstalled';
+const OFF = 'anotherCupNotificationsOff';
 const toBytes = text => Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=')), c => c.charCodeAt(0));
 const toText = buffer => btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const stored = key => { try { return localStorage.getItem(key) === 'true'; } catch { return false; } };
 const remember = key => { try { localStorage.setItem(key, 'true'); } catch {} };
+const forget = key => { try { localStorage.removeItem(key); } catch {} };
 const bounded = async promise => {
   let timer;
   try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Notification setup timed out')), 8000); })]); }
@@ -14,11 +16,11 @@ const bounded = async promise => {
 };
 
 export function mountPushPrompt({ client, panel, enable, dismiss, message, enabled = true }) {
-  let profile = null, busy = false, generation = 0, saved = '', asked = stored(ASKED);
+  let profile = null, busy = false, generation = 0, saved = '', asked = stored(ASKED), off = stored(OFF);
   let installed = stored(INSTALLED) || ['standalone', 'fullscreen', 'minimal-ui'].some(mode => matchMedia(`(display-mode: ${mode})`).matches) || navigator.standalone === true;
   const eligible = () => enabled && client && profile?.setup_complete && (profile.role === 'admin' || profile.tour_complete) && pushSupported();
   async function sync() {
-    if (!eligible() || Notification.permission !== 'granted' || !navigator.onLine || busy) return;
+    if (!eligible() || off || Notification.permission !== 'granted' || !navigator.onLine || busy) return;
     const run = generation, owner = profile.user_id;
     busy = true;
     try {
@@ -67,6 +69,23 @@ export function mountPushPrompt({ client, panel, enable, dismiss, message, enabl
   }).catch(() => {});
   return {
     update,
+    supported: pushSupported,
+    // The Notifications settings toggle: on means allowed, not switched off here, and subscribed.
+    async isOn() {
+      if (!eligible() || off || Notification.permission !== 'granted') return false;
+      const registration = await bounded(navigator.serviceWorker.ready);
+      return Boolean(await bounded(registration.pushManager.getSubscription()));
+    },
+    async turnOn() {
+      // Keep the permission request before any await: browsers require an active user gesture.
+      const permission = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
+      off = false; forget(OFF);
+      if (permission === 'granted') await sync();
+    },
+    async turnOff() {
+      off = true; remember(OFF);
+      await this.detach();
+    },
     reset() { generation++; profile = null; saved = ''; panel.hidden = true; },
     async detach() {
       if (!eligible() || Notification.permission !== 'granted') return;

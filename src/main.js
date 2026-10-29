@@ -5,6 +5,7 @@ import { mountBacklog } from './backlog-ui.js';
 import './backlog-ui.css';
 import { typing, restoreDrafts, saveSpot, takeSpot } from './live-update.js';
 import { mountPushPrompt } from './push.js';
+import { getTheme, setTheme, startTheme } from './theme.js';
 import { startReleaseUpdates } from './release-updates.js';
 import { createAccountCache } from './account-cache.js';
 import { rowMark, runPlan, staleRoasters, wishShows, WISH_LEVELS, healthSummary, sourceHealth, ageText } from './activity-model.js';
@@ -14,6 +15,7 @@ import { createLevelBar } from './level-bar.js';
 
 const $ = id => document.getElementById(id);
 mountAppShell();
+startTheme();
 const demoMode = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
 const demoMember = demoMode && new URLSearchParams(location.search).get('demo') === 'member';
 const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
@@ -201,7 +203,8 @@ function showSignedOut({ cancelLoad = true, clearCache = true } = {}) {
   $('auth').hidden = false;
   $('app').hidden = true;
   $('navigation').hidden = true;
-  $('signout').hidden = true;
+  $('settings').hidden = true;
+  toggleMenu(false);
   $('auth-form').hidden = false;
 }
 
@@ -209,7 +212,7 @@ function showSignedIn() {
   $('auth').hidden = true;
   $('app').hidden = false;
   $('navigation').hidden = showingSetup;
-  $('signout').hidden = demoMode;
+  $('settings').hidden = demoMode;
 }
 
 async function accountSession() {
@@ -378,13 +381,13 @@ function renderSetup() {
   }));
   $('roaster-setup').hidden = !showingSetup;
   $('navigation').hidden = showingSetup;
-  for (const name of ['browse', 'wishlist', 'activity', 'backlog']) $(name).hidden = showingSetup || name !== view;
+  for (const name of VIEWS) $(name).hidden = showingSetup || name !== view;
 }
 
 $('roaster-form').onsubmit = async event => {
   event.preventDefault();
   const chosen = [...$('setup-roasters').querySelectorAll('input:checked')].map(box => box.value);
-  if (!chosen.length) { notice('Choose at least one roaster.'); return; }
+  if (!chosen.length) { notice('Subscribe to at least one roaster.'); return; }
   cancelAccountLoad();
   $('save-roasters').disabled = true;
   try {
@@ -412,16 +415,15 @@ function startTour() {
 function renderTour() {
   $('feature-tour').hidden = !tourStep;
   $('navigation').inert = Boolean(tourStep);
-  $('feature-tour').classList.toggle('in-filters', tourStep === 2);
   $('open-filters').classList.toggle('tour-focus', tourStep === 1);
-  $('filter-roaster-section').classList.toggle('tour-focus', tourStep === 2);
+  $('settings').classList.toggle('tour-focus', tourStep === 2);
   if (!tourStep) return;
   $('tour-count').textContent = `Step ${tourStep} of 2`;
-  $('tour-title').textContent = tourStep === 1 ? 'Your coffee, your way' : 'Change roasters anytime';
+  $('tour-title').textContent = tourStep === 1 ? 'Your coffee, your way' : 'Subscribe to roasters anytime';
   $('tour-copy').textContent = tourStep === 1
     ? 'The filter button is where you shape Browse. Your choices are saved to your account.'
-    : 'You can change this anytime in Filters. Browse, Activity, and new bean notifications follow your roaster choices.';
-  $('tour-next').textContent = tourStep === 1 ? 'Show filters' : 'Got it';
+    : 'Open Settings, then Roasters. Browse, Activity, and new bean notifications follow your subscriptions.';
+  $('tour-next').textContent = tourStep === 1 ? 'Next' : 'Got it';
 }
 
 async function finishTour() {
@@ -438,7 +440,7 @@ async function finishTour() {
 }
 
 $('tour-next').onclick = () => {
-  if (tourStep === 1) openFilters(); else finishTour();
+  if (tourStep === 1) { tourStep = 2; renderTour(); } else finishTour();
 };
 $('tour-skip').onclick = finishTour;
 
@@ -469,9 +471,6 @@ function buildFilters() {
     };
     return button;
   }));
-
-  const roasters = new Set(selectedBeans.map(bean => bean.roaster));
-  $('filter-roasters').replaceChildren(...[...roasters].sort().map(value => checkboxOption('roasters', value)));
 
   const available = new Set(selectedBeans.flatMap(bean => values(bean, 'origins')));
   available.delete('unknown');
@@ -1466,9 +1465,10 @@ function refreshBacklogView() {
   if (admin) backlog.reload(); else refreshRequests();
 }
 
+const VIEWS = ['browse', 'wishlist', 'activity', 'backlog', 'settings-roasters', 'settings-notifications'];
 function setView(next) {
   view = next;
-  for (const name of ['browse', 'wishlist', 'activity', 'backlog']) $(name).hidden = showingSetup || name !== view;
+  for (const name of VIEWS) $(name).hidden = showingSetup || name !== view;
   document.querySelectorAll('nav button').forEach(button => {
     const active = button.dataset.view === view;
     button.classList.toggle('active', active);
@@ -1493,20 +1493,18 @@ function openFilters() {
   document.querySelector('.filter-body').scrollTop = 0;
   renderFilterPanel();
   $('filter-close').focus();
-  if (tourStep === 1) { tourStep = 2; renderTour(); $('filter-roaster-section').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 $('open-filters').onclick = openFilters;
 function closeFilters() {
   draftFilters = null;
   $('filter-overlay').hidden = true;
   document.body.classList.remove('filters-open');
-  if (tourStep === 2) { tourStep = 1; renderTour(); }
   $('open-filters').focus();
 }
 async function applyFilters() {
   if (!draftFilters || savingFilters) return;
   const chosen = Object.keys(draftFilters.roasters).filter(name => draftFilters.roasters[name]);
-  if (!chosen.length) { $('filter-results').textContent = 'Choose at least one roaster.'; return; }
+  if (!chosen.length) { $('filter-results').textContent = 'Subscribe to at least one roaster.'; return; }
   if (!demoMode && !navigator.onLine) { $('filter-results').textContent = 'Reconnect to save filters.'; return; }
   savingFilters = true;
   cancelAccountLoad();
@@ -1521,9 +1519,8 @@ async function applyFilters() {
       profile = Array.isArray(result.data) ? result.data[0] : result.data;
     }
     appliedFilters = cloneFilters(draftFilters);
-    const finishGuide = tourStep === 2;
     buildFilters(); render(); notice('');
-    if (finishGuide) await finishTour(); else closeFilters();
+    closeFilters();
   } catch (error) {
     $('filter-results').textContent = error.code === '40001' ? 'Filters changed on another device. Close and reopen to reload.'
       : error.message || 'Could not save filters.';
@@ -1583,6 +1580,7 @@ $('auth-form').onsubmit = async event => {
 };
 const pushPrompt = mountPushPrompt({ client, panel: $('push-prompt'), enable: $('push-enable'), dismiss: $('push-dismiss'), message: $('push-message'), enabled: !demoMode });
 $('signout').onclick = async () => {
+  toggleMenu(false);
   cancelAccountLoad();
   await pushPrompt.detach().catch(() => {});
   try {
@@ -1592,6 +1590,82 @@ $('signout').onclick = async () => {
   catch { notice('Could not sign out. Reconnect and try again.'); return; }
   showSignedOut();
   $('data-status').hidden = true;
+};
+// Settings menu: theme (no view), Roasters, Notifications, Sign out.
+const menu = $('settings-menu'), gear = $('settings');
+function toggleMenu(open = menu.hidden) {
+  menu.hidden = !open;
+  gear.setAttribute('aria-expanded', String(open));
+  if (open) menu.querySelectorAll('[data-theme]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.theme === getTheme())));
+}
+gear.onclick = event => { event.stopPropagation(); toggleMenu(); };
+document.addEventListener('click', event => { if (!menu.hidden && !menu.contains(event.target)) toggleMenu(false); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !menu.hidden) { toggleMenu(false); gear.focus(); } });
+menu.querySelectorAll('[data-theme]').forEach(button => button.onclick = () => {
+  setTheme(button.dataset.theme);
+  menu.querySelectorAll('[data-theme]').forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+});
+let returnView = 'browse';
+function openSettingsView(name) {
+  if (!view.startsWith('settings-')) returnView = view;
+  setView(name);
+  if (name === 'settings-roasters') renderRosterSettings(); else renderNotifySettings();
+}
+document.querySelectorAll('[data-back]').forEach(button => button.onclick = () => setView(returnView));
+$('open-roasters').onclick = () => { toggleMenu(false); openSettingsView('settings-roasters'); };
+$('open-notifications').onclick = () => { toggleMenu(false); openSettingsView('settings-notifications'); };
+
+function renderRosterSettings() {
+  if (!snapshot || !profile) return;
+  const names = [...new Set(snapshot.beans.map(bean => bean.roaster))].sort();
+  $('settings-roasters-list').replaceChildren(...names.map(name => {
+    const label = node('label', 'setup-roaster');
+    const box = document.createElement('input');
+    box.type = 'checkbox'; box.value = name; box.checked = profile.roasters.includes(name);
+    label.append(box, node('span', '', name));
+    return label;
+  }));
+  $('settings-roasters-status').textContent = '';
+}
+$('settings-roasters-form').onsubmit = async event => {
+  event.preventDefault();
+  const chosen = [...$('settings-roasters-list').querySelectorAll('input:checked')].map(box => box.value);
+  const status = $('settings-roasters-status');
+  if (!chosen.length) { status.textContent = 'Subscribe to at least one roaster.'; return; }
+  if (!demoMode && !navigator.onLine) { status.textContent = 'Reconnect to save.'; return; }
+  cancelAccountLoad();
+  $('settings-roasters-save').disabled = true;
+  try {
+    if (demoMode) profile = { ...profile, roasters: chosen, filter_revision: profile.filter_revision + 1 };
+    else {
+      const result = await client.rpc('save_roaster_subscriptions', { next_roasters: chosen });
+      if (result.error) throw result.error;
+      profile = Array.isArray(result.data) ? result.data[0] : result.data;
+    }
+    appliedFilters = savedFilters(profile.filter_state, profile.roasters);
+    buildFilters(); render();
+    status.textContent = 'Saved.';
+  } catch (error) { status.textContent = error.message || 'Could not save roasters.'; }
+  finally { $('settings-roasters-save').disabled = false; }
+};
+
+async function renderNotifySettings() {
+  const box = $('notify-toggle'), status = $('notify-status');
+  $('open-system-settings').hidden = !/Android/i.test(navigator.userAgent);
+  status.textContent = '';
+  if (!pushPrompt.supported()) { box.checked = false; box.disabled = true; status.textContent = 'Not supported on this device.'; return; }
+  if (Notification.permission === 'denied') { box.checked = false; box.disabled = true; status.textContent = 'Blocked in system settings.'; return; }
+  box.disabled = false;
+  box.checked = await pushPrompt.isOn().catch(() => false);
+}
+// A web page cannot open system settings directly; on Android this opens Chrome's notification settings.
+$('open-system-settings').onclick = () => { location.href = 'intent:#Intent;action=android.settings.APP_NOTIFICATION_SETTINGS;S.android.provider.extra.APP_PACKAGE=com.android.chrome;end'; };
+$('notify-toggle').onchange = async () => {
+  const box = $('notify-toggle');
+  box.disabled = true;
+  try { if (box.checked) await pushPrompt.turnOn(); else await pushPrompt.turnOff(); }
+  catch { await renderNotifySettings(); $('notify-status').textContent = 'Could not change notifications. Try again.'; return; }
+  await renderNotifySettings();
 };
 async function restoreSession() {
   return loadData();

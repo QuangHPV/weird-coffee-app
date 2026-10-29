@@ -72,7 +72,7 @@ test('sign out removes this account subscription and unsubscribes the device', a
   const app = await appFixture(page);
   await app.open(); await app.ready();
   await expect.poll(() => app.calls.save_push_subscription).toBe(1);
-  await page.locator('#signout').click();
+  await page.locator('#settings').click(); await page.locator('#signout').click();
   await expect(page.locator('#auth')).toBeVisible();
   expect(app.calls.remove_push_subscription).toBe(1);
   expect(await page.evaluate(() => window.__push.unsubscribes)).toBe(1);

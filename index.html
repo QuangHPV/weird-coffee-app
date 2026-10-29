@@ -34,7 +34,17 @@
 <body>
   <header class="topbar">
     <h1>Find your next bag</h1>
-    <div class="toptools"><button id="enter-fullscreen" type="button" aria-label="Use full screen" title="Use full screen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 7l5 5-5 5m5-5H9"/></svg></button></div>
+    <div class="toptools"><button id="enter-fullscreen" type="button" aria-label="Use full screen" title="Use full screen" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><div class="settings-wrap"><button id="settings" type="button" aria-label="Settings" title="Settings" aria-haspopup="menu" aria-expanded="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+      <div id="settings-menu" class="settings-menu" role="menu" hidden>
+        <div class="settings-theme" role="group" aria-label="Theme"><span>Theme</span>
+          <button type="button" data-theme="system" aria-label="System theme" title="System"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4m-4 0h8"/></svg></button>
+          <button type="button" data-theme="light" aria-label="Light theme" title="Light"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg></button>
+          <button type="button" data-theme="dark" aria-label="Dark theme" title="Dark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.4A8.8 8.8 0 0 1 8.6 3.7a8.8 8.8 0 1 0 11.7 11.7Z"/></svg></button>
+        </div>
+        <button id="open-roasters" type="button" role="menuitem">Roasters<span aria-hidden="true">&rsaquo;</span></button>
+        <button id="open-notifications" type="button" role="menuitem">Notifications<span aria-hidden="true">&rsaquo;</span></button>
+        <button id="signout" type="button" role="menuitem">Sign out</button>
+      </div></div></div>
   </header>
   <main>
     <div id="data-status" class="notice data-status" role="status" hidden><span id="data-message"></span><button id="data-retry" type="button">Retry</button></div>
@@ -56,8 +66,8 @@
       </section>
       <div id="notice" class="notice" role="status" hidden></div>
       <section id="roaster-setup" class="account-setup" aria-labelledby="setup-heading" hidden>
-        <span class="eyebrow">Your coffee</span><h2 id="setup-heading">Choose your roasters</h2>
-        <p>Choose at least one. A quick guide will show you where to change this later.</p>
+        <span class="eyebrow">Your coffee</span><h2 id="setup-heading">Subscribe to roasters</h2>
+        <p>Subscribe to at least one. A quick guide will show you where to change this later.</p>
         <form id="roaster-form"><div id="setup-roasters" class="setup-roasters"></div>
           <button id="save-roasters" class="primary" type="submit">Continue</button></form>
       </section>
@@ -90,6 +100,21 @@
         </div>
         <div id="activity-detail" class="activity-detail" hidden></div>
       </section>
+      <section id="settings-roasters" aria-labelledby="settings-roasters-heading" hidden>
+        <button class="back-link" type="button" data-back>&lsaquo; Back</button>
+        <div class="section-heading"><div><span class="eyebrow">Settings</span><h2 id="settings-roasters-heading">Roasters</h2></div></div>
+        <p class="muted">Subscribe to the roasters that appear in Browse, Activity, and new bean notifications.</p>
+        <form id="settings-roasters-form"><div id="settings-roasters-list" class="setup-roasters"></div>
+          <button id="settings-roasters-save" class="primary" type="submit">Save</button></form>
+        <p id="settings-roasters-status" class="muted" role="status"></p>
+      </section>
+      <section id="settings-notifications" aria-labelledby="settings-notifications-heading" hidden>
+        <button class="back-link" type="button" data-back>&lsaquo; Back</button>
+        <div class="section-heading"><div><span class="eyebrow">Settings</span><h2 id="settings-notifications-heading">Notifications</h2></div></div>
+        <label class="switch-row"><span>New beans and restocks</span><input id="notify-toggle" type="checkbox" role="switch"></label>
+        <p id="notify-status" class="muted" role="status"></p>
+        <button id="open-system-settings" class="system-settings" type="button" hidden>Open in system settings</button>
+      </section>
       <section id="backlog" aria-label="Requests and backlog" hidden>
         <div id="backlog-root" class="backlog-shell"></div>
         <div id="requests-root" hidden>
@@ -121,7 +146,6 @@
         </section>
         <section class="filter-section"><h3>Process</h3><div id="filter-process" class="filter-chips"></div></section>
         <section class="filter-section"><h3>Origin</h3><div id="filter-origins" class="origin-groups"></div></section>
-        <section id="filter-roaster-section" class="filter-section"><h3>Your roasters</h3><p class="filter-help">Choose the roasters that appear in Browse, Activity, and new bean notifications.</p><div id="filter-roasters" class="filter-options"></div></section>
         <section class="filter-section"><h3>Sort</h3><div id="filter-sort" class="sort-options" role="radiogroup" aria-label="Sort beans"></div></section>
       </div>
       <footer class="filter-footer"><span id="filter-results" role="status"></span><div><button id="filter-cancel" type="button">Cancel</button><button id="filter-apply" class="primary" type="button">Apply</button></div></footer>
