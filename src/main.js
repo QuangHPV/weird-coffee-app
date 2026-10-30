@@ -40,8 +40,9 @@ let decisions = [];            // replacement choices made on a device, not yet 
 let deciding = false;
 let view = 'browse';
 let demoBacklog = { document: { tasks: [
-  { id: 'sample-1', text: 'Refine the Browse cards #mobile\nCheck spacing on a phone.', created: '2026-10-18T09:30:00.000Z', done_at: null, author_name: 'Coffee Owner' },
+  { id: 'sample-1', text: 'Refine the Browse cards #mobile\nCheck spacing on a phone.', created: '2026-10-18T09:30:00.000Z', done_at: null, lane: 'now', progress: { done: 2, total: 5 }, author_name: 'Coffee Owner' },
   { id: 'sample-2', text: 'Add more roasters #catalog', created: '2026-10-17T02:10:00.000Z', done_at: null, author_name: 'Coffee Owner' },
+  { id: 'sample-4', text: 'Try a sold-out forecast #idea', created: '2026-10-15T02:10:00.000Z', done_at: null, lane: 'later', author_name: 'Coffee Owner' },
   { id: 'sample-3', text: 'Review spacing on a phone #mobile', created: '2026-10-16T08:00:00.000Z', done_at: '2026-10-17T06:45:00.000Z', author_name: 'Coffee Owner' }
 ] }, revision: 1 };
 const backlog = mountBacklog($('backlog-root'), {

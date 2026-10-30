@@ -4,7 +4,7 @@ export async function appFixture(page, options = {}) {
   const user = { id: 'test-member', name: 'Test member', email: 'test@example.invalid' };
   const profile = { user_id: user.id, role: 'member', display_name: user.name, setup_complete: true, tour_complete: true, roasters: ['Test Roaster'], filter_revision: 1, filter_state: {} };
   const beans = Array.from({ length: 20 }, (_, i) => ({ id: `bean-${i}`, roaster: 'Test Roaster', title: `Coffee ${i + 1}`, available: true, price: 20, grams: 250, per100g: 8, url: 'https://shop.example.invalid/coffee', label: { origins: ['Ethiopia'], process: ['Washed'], roast: 'light' } }));
-  const state = { signedIn: true, calls: {}, errors: [], publishedAt: '2026-10-22T00:00:00Z', ranking: { ids: [], revision: 1 }, archives: [], runs: [], activity: null, profile, beans, intercept: null, ...options };
+  const state = { signedIn: true, calls: {}, errors: [], publishedAt: '2026-10-22T00:00:00Z', ranking: { ids: [], revision: 1 }, archives: [], runs: [], activity: null, profile, beans, intercept: null, backlog: { document: { tasks: [] }, revision: 1 }, ...options };
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers: { 'access-control-allow-origin': route.request().headers().origin || 'http://127.0.0.1:5175', 'access-control-allow-credentials': 'true', 'access-control-expose-headers': 'set-auth-jwt' } });
   const jwt = () => `${btoa('{}')}.${btoa(JSON.stringify({ sub: state.profile.user_id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 900, version: state.calls.token || 0 }))}.test`;
   page.on('pageerror', error => state.errors.push(error.message));
@@ -38,6 +38,8 @@ export async function appFixture(page, options = {}) {
       case 'feature_requests': return json(route, []);
       case 'save_wishlist': state.ranking = { ids: body.next_ids, revision: state.ranking.revision + 1 }; return json(route, state.ranking);
       case 'save_filter_preferences': state.profile = { ...state.profile, filter_state: body.next_filters, roasters: body.next_roasters, filter_revision: state.profile.filter_revision + 1 }; return json(route, state.profile);
+      case 'backlog_state': return json(route, [state.backlog]);
+      case 'save_backlog': state.backlog = { document: body.next_document, revision: state.backlog.revision + 1 }; return json(route, state.backlog);
       default: return json(route, null);
     }
   });
