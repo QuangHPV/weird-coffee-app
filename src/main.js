@@ -46,6 +46,9 @@ let demoBacklog = { document: { tasks: [
   { id: 'sample-3', text: 'Review spacing on a phone #mobile', created: '2026-10-16T08:00:00.000Z', done_at: '2026-10-17T06:45:00.000Z', author_name: 'Coffee Owner' }
 ] }, revision: 1 };
 const backlog = mountBacklog($('backlog-root'), {
+  // An open task is a history entry, so the phone's back gesture returns to the list.
+  enterDetail() { history.pushState({ backlogDetail: true }, ''); },
+  exitDetail() { if (history.state?.backlogDetail) history.back(); },
   async load() {
     if (demoMode) return structuredClone(demoBacklog);
     if (!client || !navigator.onLine) throw new Error('Connect to load the backlog.');
@@ -1282,6 +1285,7 @@ window.addEventListener('popstate', () => {
   if (!$('exit-overlay').hidden) { showExit(false); history.pushState({ view }, ''); return; }
   if (!$('filter-overlay').hidden) { closeFilters(); history.pushState({ view }, ''); return; }
   if (activityDetailId !== null) { closeActivityDetail(true); return; }
+  if (backlog.detailOpen()) { backlog.leave(); return; }
   if (state?.view) { setView(state.view, true); return; }
   history.pushState({ view }, '');
   showExit(true);
@@ -1431,18 +1435,17 @@ function render() { renderReplacements(); renderBrowse(); renderWishlist(); rend
 function renderRequests() {
   const list = $('request-list');
   list.replaceChildren(...requests.map(item => {
-    const card = node('article', 'request-card');
-    const head = node('div', 'request-head');
-    head.append(node('span', `request-state ${item.status}`, item.status === 'completed' ? 'Completed' : 'Requested'),
-      node('span', 'request-author', `By ${item.author_name || 'Member'}`),
-      node('time', '', date(item.completed_at || item.created_at)));
+    const row = node('li', 'bl-req');
     const [title, ...body] = item.text.split('\n');
-    card.append(head, node('h3', '', title));
-    if (item.merged_title && item.status !== 'completed') card.append(node('p', 'request-merged', `Part of: ${item.merged_title}`));
-    if (body.length) card.append(node('p', '', body.join('\n')));
-    return card;
+    const head = node('div', 'bl-row-title');
+    head.append(node('span', 'bl-row-name', title), node('span', `bl-status ${item.status === 'completed' ? 'done' : ''}`, item.status === 'completed' ? 'Completed' : 'Requested'));
+    row.append(head);
+    if (item.merged_title && item.status !== 'completed') row.append(node('div', 'bl-req-part', `Part of ${item.merged_title}`));
+    if (body.length) row.append(node('div', 'bl-req-body', body.join('\n')));
+    row.append(node('div', 'bl-meta-line', `${item.author_name || 'Member'}, ${date(item.completed_at || item.created_at)}`));
+    return row;
   }));
-  if (!requests.length) list.append(node('div', 'empty-state', 'No feature requests yet. Tell us what would make Another Cup better.'));
+  if (!requests.length) list.append(node('li', 'bl-empty', 'No requests yet'));
 }
 
 async function refreshRequests() {
@@ -1487,7 +1490,7 @@ let replacedDetail = false;
 function setView(next, fromBack = false) {
   replacedDetail = false;
   if (!fromBack && next !== view) {
-    if (activityDetailId !== null && history.state?.activityDetail !== undefined) { history.replaceState({ view: next }, ''); replacedDetail = true; }
+    if ((activityDetailId !== null && history.state?.activityDetail !== undefined) || (backlog.detailOpen() && history.state?.backlogDetail)) { history.replaceState({ view: next }, ''); replacedDetail = true; }
     else history.pushState({ view: next }, '');
   }
   view = next;
@@ -1498,6 +1501,7 @@ function setView(next, fromBack = false) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
+  if (backlog.detailOpen() && view !== 'backlog') backlog.leave();
   if (activityDetailId !== null) { activityDetailId = null; if (!replacedDetail && history.state?.activityDetail !== undefined) history.back(); renderActivity(); }
   window.scrollTo(0, 0);
   if (view === 'backlog') refreshBacklogView();

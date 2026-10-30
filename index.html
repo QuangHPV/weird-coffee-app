@@ -115,10 +115,12 @@
       </section>
       <section id="backlog" aria-label="Requests and backlog" hidden>
         <div id="backlog-root" class="backlog-shell"></div>
-        <div id="requests-root" hidden>
-          <div class="section-heading"><div><span class="eyebrow">Community ideas</span><h2>Feature requests</h2></div></div>
-          <form id="request-form" class="request-form"><label for="request-text">What should improve?</label><textarea id="request-text" maxlength="2000" rows="2" required></textarea><button class="primary" type="submit">Send request</button></form>
-          <p id="request-status" role="status" class="muted"></p><div id="request-list"></div>
+        <div id="requests-root" class="backlog-shell" hidden>
+          <div class="bl-pane">
+            <form id="request-form" class="bl-compose"><textarea id="request-text" maxlength="2000" rows="2" required aria-label="New request" placeholder="What should improve?"></textarea><button class="bl-btn primary" type="submit">Send request</button></form>
+            <p id="request-status" role="status" class="bl-notice"></p>
+            <ul id="request-list" class="bl-list"></ul>
+          </div>
         </div>
       </section>
     </section>

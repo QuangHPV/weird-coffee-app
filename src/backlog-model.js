@@ -66,3 +66,51 @@ export function ageLabel(stamp, now = new Date()) {
 export function normalizeDocument(document) {
   return { tasks: Array.isArray(document?.tasks) ? document.tasks : [] };
 }
+
+export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+
+export const joinMessage = (title, body) => body.trim() ? `${title.trim()}\n${body.trim()}` : title.trim();
+
+// The title without its #tags.
+export const stripTags = text => String(text).replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, '$1').replace(/\s+/g, ' ').trim();
+
+// First line of the body with the markdown marks removed, for the list preview.
+export function previewLine(body) {
+  const line = String(body).split('\n').map(value => value.trim()).find(Boolean) || '';
+  return line.replace(/^(#{1,3}\s+|[-*]\s+(\[[ xX]\]\s+)?)/, '').replace(/[*`]/g, '').slice(0, 160);
+}
+
+export const matchesQuery = (text, query) => {
+  const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
+  const haystack = String(text).toLowerCase();
+  return words.every(word => haystack.includes(word));
+};
+
+const inline = line => escapeHtml(line)
+  .replace(/`([^`]+)`/g, '<code>$1</code>')
+  .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  .replace(/(^|[\s(>])(#[\p{L}\p{N}_-]+)/gu, '$1<span class="bl-tag">$2</span>');
+
+// A small, safe subset of markdown: headings, bullet and checkbox lists, paragraphs,
+// **bold**, `code`, links and #tags. Everything else is plain text.
+export function renderMarkdown(text) {
+  const html = [];
+  let list = false, paragraph = [];
+  const endParagraph = () => { if (paragraph.length) html.push(`<p>${paragraph.join('<br>')}</p>`); paragraph = []; };
+  const endList = () => { if (list) html.push('</ul>'); list = false; };
+  for (const line of String(text).split('\n')) {
+    const heading = line.match(/^(#{1,3})\s+(.*)$/), item = line.match(/^\s*[-*]\s+(?:\[([ xX])\]\s+)?(.*)$/);
+    if (heading) { endParagraph(); endList(); html.push(`<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`); }
+    else if (item) {
+      endParagraph();
+      if (!list) { html.push('<ul>'); list = true; }
+      const box = item[1] === undefined ? '' : `<input type="checkbox" disabled ${item[1] === ' ' ? '' : 'checked'}> `;
+      html.push(`<li${box ? ' class="check"' : ''}>${box}${inline(item[2])}</li>`);
+    } else if (!line.trim()) { endParagraph(); endList(); }
+    else { endList(); paragraph.push(inline(line)); }
+  }
+  endParagraph(); endList();
+  return html.join('');
+}

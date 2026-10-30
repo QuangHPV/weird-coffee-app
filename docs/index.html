@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta name="app-release" content="31c855805b5dfa54ba73">
+  <meta name="app-release" content="b6a94e80f7e5061b836d">
   <meta charset="utf-8">
   <style>
     html{background:#f7f3ed;color:#292019;font-family:system-ui,sans-serif}body{margin:0}button,input,textarea{font:inherit}[hidden]{display:none!important}
@@ -30,8 +30,8 @@
       }).catch(() => {});
     }
   </script>
-  <script type="module" crossorigin src="./assets/index-Cg6Xx3Xh.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DGNL1k6u.css">
+  <script type="module" crossorigin src="./assets/index-DxyeXnRm.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-5BNZ9Xlr.css">
 </head>
 <body>
   <header class="topbar">
@@ -117,10 +117,12 @@
       </section>
       <section id="backlog" aria-label="Requests and backlog" hidden>
         <div id="backlog-root" class="backlog-shell"></div>
-        <div id="requests-root" hidden>
-          <div class="section-heading"><div><span class="eyebrow">Community ideas</span><h2>Feature requests</h2></div></div>
-          <form id="request-form" class="request-form"><label for="request-text">What should improve?</label><textarea id="request-text" maxlength="2000" rows="2" required></textarea><button class="primary" type="submit">Send request</button></form>
-          <p id="request-status" role="status" class="muted"></p><div id="request-list"></div>
+        <div id="requests-root" class="backlog-shell" hidden>
+          <div class="bl-pane">
+            <form id="request-form" class="bl-compose"><textarea id="request-text" maxlength="2000" rows="2" required aria-label="New request" placeholder="What should improve?"></textarea><button class="bl-btn primary" type="submit">Send request</button></form>
+            <p id="request-status" role="status" class="bl-notice"></p>
+            <ul id="request-list" class="bl-list"></ul>
+          </div>
         </div>
       </section>
     </section>

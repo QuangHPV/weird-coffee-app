@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newTask, splitMessage, dayKey, weekKey, groupByWeek, laneOf, setLane, tagsOf, ageLabel, normalizeDocument } from '../src/backlog-model.js';
+import { newTask, splitMessage, dayKey, weekKey, groupByWeek, laneOf, setLane, tagsOf, ageLabel, normalizeDocument, joinMessage, stripTags, previewLine, matchesQuery, renderMarkdown } from '../src/backlog-model.js';
 
 test('a new task is on the TODO list', () => {
   const task = newTask('  Fix the heart  ');
@@ -66,4 +66,31 @@ test('ages are short', () => {
 test('a missing task list becomes empty', () => {
   assert.deepEqual(normalizeDocument({}), { tasks: [] });
   assert.deepEqual(normalizeDocument(null), { tasks: [] });
+});
+
+test('title and body join and split back', () => {
+  assert.equal(joinMessage(' Title ', ' body\nmore '), 'Title\nbody\nmore');
+  assert.equal(joinMessage('Only', ''), 'Only');
+  assert.deepEqual(splitMessage(joinMessage('T #x', 'b')), { title: 'T #x', body: 'b' });
+});
+
+test('tags are stripped from titles and markdown marks from previews', () => {
+  assert.equal(stripTags('Fix it #ui #mobile'), 'Fix it');
+  assert.equal(stripTags('Plain'), 'Plain');
+  assert.equal(previewLine('\n- [ ] Do **this** `now`'), 'Do this now');
+  assert.equal(previewLine('## Goal\nx'), 'Goal');
+});
+
+test('search matches every word, any case', () => {
+  assert.equal(matchesQuery('Fix the Heart #ui', 'heart fix'), true);
+  assert.equal(matchesQuery('Fix the Heart #ui', 'heart bug'), false);
+  assert.equal(matchesQuery('anything', '  '), true);
+});
+
+test('markdown renders a safe subset', () => {
+  assert.equal(renderMarkdown('## Goal\nSome **bold** `code` #tag'), '<h2>Goal</h2><p>Some <strong>bold</strong> <code>code</code> <span class="bl-tag">#tag</span></p>');
+  assert.equal(renderMarkdown('- [x] done\n- [ ] todo\n- plain'),
+    '<ul><li class="check"><input type="checkbox" disabled checked> done</li><li class="check"><input type="checkbox" disabled > todo</li><li>plain</li></ul>');
+  assert.equal(renderMarkdown('<img src=x onerror=alert(1)>'), '<p>&lt;img src=x onerror=alert(1)&gt;</p>');
+  assert.equal(renderMarkdown('[a](javascript:alert(1)) [b](https://x.test/p)'), '<p>[a](javascript:alert(1)) <a href="https://x.test/p" target="_blank" rel="noopener noreferrer">b</a></p>');
 });
