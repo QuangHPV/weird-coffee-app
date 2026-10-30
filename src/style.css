@@ -302,7 +302,7 @@ button,a,summary,label{touch-action:manipulation}
   .wish-actions .wish-remove:hover { background: #320f0d; color: #c35757; }
   .wish-actions .wish-remove:focus-visible, .wish-arrows button:focus-visible { outline: 2px solid #cca284; }
   .wish-empty { color: #928a85; }
-  #backlog { --text: #eef2f8; --bg: #0c1018; --panel: #141a24; --muted: #a3afc2; --line: #323d50; --accent: #86adff; --no: #ff8e8e; }
+  #backlog { --text: #e9eaf0; --bg: #141415; --panel: #1c1c24; --muted: #a9abc0; --line: #34343f; --accent: #7e98e8; --no: #d8647e; }
   .heart { color: #957767; }
   .heart.saved { color: #b04b49; }
   @media (hover: hover) { .heart:hover:not(:disabled) { background: #320f0d; color: #c35757; } }
