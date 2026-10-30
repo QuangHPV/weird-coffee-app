@@ -45,6 +45,9 @@ let demoBacklog = { document: { tasks: [
   { id: 'sample-4', text: 'Try a sold-out forecast #idea', created: '2026-10-15T02:10:00.000Z', done_at: null, lane: 'later', author_name: 'Coffee Owner' },
   { id: 'sample-3', text: 'Review spacing on a phone #mobile', created: '2026-10-16T08:00:00.000Z', done_at: '2026-10-17T06:45:00.000Z', author_name: 'Coffee Owner' }
 ] }, revision: 1 };
+// The backlog fills the screen under the top bar, so it needs the bar's height.
+const topbar = document.querySelector('.topbar');
+new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-h', `${topbar.offsetHeight}px`)).observe(topbar);
 const backlog = mountBacklog($('backlog-root'), {
   // An open task is a history entry, so the phone's back gesture returns to the list.
   enterDetail() { history.pushState({ backlogDetail: true }, ''); },

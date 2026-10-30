@@ -130,8 +130,9 @@ body.wish-reordering { user-select: none; -webkit-user-select: none; }
 
 nav#navigation{grid-template-columns:repeat(4,minmax(0,1fr))}
 nav#navigation button{min-width:0}
-#backlog{--text:#2b2018;--panel:#fffdfa;--muted:#756d67;--line:#e5d9cd;--accent:#794a2a;--no:#a3372d}
-#backlog .backlog-shell{min-width:0;max-width:100%}
+#backlog{--text:#2b2018;--bg:#f7f3ed;--panel:#fffdfa;--muted:#756d67;--line:#e5d9cd;--accent:#794a2a;--no:#a3372d}
+#backlog .backlog-shell{min-width:0;max-width:100%;--bl-h:calc(100dvh - var(--topbar-h,76px) - var(--nav-reserve))}
+body:has(#backlog:not([hidden])) main{max-width:none;padding:0}
 
 .heart{display:grid;place-items:center;padding:8px;background:transparent;color:#9a7763;border-color:transparent}
 .heart svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
@@ -301,7 +302,7 @@ button,a,summary,label{touch-action:manipulation}
   .wish-actions .wish-remove:hover { background: #320f0d; color: #c35757; }
   .wish-actions .wish-remove:focus-visible, .wish-arrows button:focus-visible { outline: 2px solid #cca284; }
   .wish-empty { color: #928a85; }
-  #backlog { --text: #f4ebe3; --panel: #251d17; --muted: #b9aca2; --line: #413426; --accent: #e3b08c; --no: #ef8a80; }
+  #backlog { --text: #f0ece6; --bg: #151413; --panel: #1d1c1a; --muted: #c3bdb5; --line: #4a4743; --accent: #e2b27f; --no: #ff9c93; }
   .heart { color: #957767; }
   .heart.saved { color: #b04b49; }
   @media (hover: hover) { .heart:hover:not(:disabled) { background: #320f0d; color: #c35757; } }
