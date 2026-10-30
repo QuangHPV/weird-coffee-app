@@ -33,34 +33,34 @@ test('folders list one-line rows with progress, tags and a preview', async ({ pa
   await expect(page.getByRole('tab', { name: /Later/ })).toContainText('1');
 });
 
-test('a row opens in the editor, saving changes the text and the plus starts a new task', async ({ page }) => {
+test('a row opens in the editor, edits save themselves and the plus starts a new task', async ({ page }) => {
   const app = await openBacklog(page, [task('a', 'Edit me #ui\nold body', { lane: 'now' })]);
   await page.locator('.bl-row').click();
   await expect(page.locator('.bl-list-pane')).toBeHidden();
   await expect(page.locator('[name=title]')).toHaveValue('Edit me #ui');
   await expect(page.locator('[name=body]')).toHaveValue('old body');
-  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+  await expect(page.locator('.bl-meta')).toContainText('Created');
   await page.locator('[name=title]').fill('Edited title #ui');
   await page.locator('[name=body]').fill('- [x] new body');
   await page.getByRole('tab', { name: 'Preview', exact: true }).click();
   await expect(page.locator('.bl-preview input[type=checkbox]')).toBeChecked();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => saved(app, 'a').text).toBe('Edited title #ui\n- [x] new body');
+  await page.getByRole('button', { name: 'Back to list' }).click();
   await expect(page.locator('.bl-list-pane')).toBeVisible();
   await page.getByRole('button', { name: 'New task' }).click();
   await page.locator('[name=title]').fill('Brand new');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect.poll(() => app.backlog.document.tasks.length).toBe(2);
   expect(app.backlog.document.tasks[1].lane).toBe('now');
 });
 
-test('Cancel discards edits and swipe back keeps them', async ({ page }) => {
+test('Back and swipe back keep what was typed', async ({ page }) => {
   const app = await openBacklog(page, [task('a', 'Keep me', { lane: 'now' })]);
   await page.locator('.bl-row').click();
-  await page.locator('[name=title]').fill('Typed then cancelled');
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.locator('[name=title]').fill('Typed then back');
+  await page.getByRole('button', { name: 'Back to list' }).click();
   await expect(page.locator('.bl-list-pane')).toBeVisible();
-  expect(saved(app, 'a').text).toBe('Keep me');
+  await expect.poll(() => saved(app, 'a').text).toBe('Typed then back');
   await page.locator('.bl-row').click();
   await page.locator('[name=title]').fill('Typed then swiped');
   await swipeRight(page);
@@ -73,9 +73,9 @@ test('lanes: Now holds three, a move follows the task, done goes to Done and Reo
   const app = await openBacklog(page, ['a', 'b', 'c', 'd'].map(id => task(id, `Task ${id}`, id === 'd' ? {} : { lane: 'now' })));
   await page.getByRole('tab', { name: /Inbox/ }).click();
   await page.locator('.bl-row').click();
-  await page.getByRole('button', { name: 'Now', exact: true }).click();
+  await page.locator('[name=lane]').selectOption('now');
   await expect(page.locator('.bl-message')).toContainText('Now is full');
-  await page.getByRole('button', { name: 'Later', exact: true }).click();
+  await page.locator('[name=lane]').selectOption('later');
   await expect.poll(() => saved(app, 'd').lane).toBe('later');
   await expect(page.getByRole('tab', { name: /Later/ })).toHaveClass(/on/);
   await page.locator('.bl-row').click();
@@ -124,7 +124,7 @@ test('a request task is read only but can be moved', async ({ page }) => {
   await expect(page.locator('[name=title]')).toHaveCount(0);
   await expect(page.locator('.bl-title-read')).toHaveText('Please add restaurants');
   await expect(page.getByRole('button', { name: 'Delete task' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Later', exact: true }).click();
+  await page.locator('[name=lane]').selectOption('later');
   await expect.poll(() => saved(app, 'r').lane).toBe('later');
 });
 

@@ -12,6 +12,9 @@ const EMPTY = { now: 'Nothing in Now', inbox: 'Inbox is empty', later: 'Nothing 
 const WIDE = 820;
 const PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/></svg>';
+const CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const UNDO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-4"/></svg>';
+const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
 const CHEVRON = '<svg class="bl-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 const shortDay = day => new Date(`${day}T00:00:00`).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
 const longDay = stamp => new Date(`${dayKey(stamp)}T00:00:00`).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
@@ -29,6 +32,7 @@ export function mountBacklog(root, adapter) {
   let state = null, folder = 'now', query = '', tag = '';
   let openId = null;                       // id of the task in the editor, 'new' for a task not saved yet
   let edit = null;                         // { title, body, mode: 'write' | 'preview', lane } of the open task
+  let saveTimer = 0;
   let confirming = false, busy = false, loading = false, message = '', listScroll = 0;
   const weekOpen = new Map();              // week key -> shown or folded; the newest two weeks start shown
   const tasks = () => state?.document.tasks ?? [];
@@ -103,16 +107,12 @@ export function mountBacklog(root, adapter) {
   }
 
   function paintMessage() {
-    q('.bl-message').textContent = message || (state?.synced === false ? 'Offline copy. Reconnect to edit.' : '');
+    const text = message || (state?.synced === false ? 'Offline copy. Reconnect to edit.' : '');
+    for (const box of root.querySelectorAll('.bl-message, .bl-note')) box.textContent = text;
   }
 
   function autosize() {
     for (const box of root.querySelectorAll('.bl-title-input, .bl-body-input')) { box.style.height = 'auto'; box.style.height = `${box.scrollHeight}px`; }
-  }
-
-  function syncSave() {
-    const save = q('[data-action="save"]');
-    if (save) save.disabled = !dirty() || disabled();
   }
 
   function paintDetail(focus = null) {
@@ -126,37 +126,37 @@ export function mountBacklog(root, adapter) {
     const meta = [task ? `Created ${longDay(task.created)}` : '', task?.done_at ? `Done ${longDay(task.done_at)}` : '',
       task?.merged_into ? `Merged into ${mergedTitle(task.merged_into)}` : '',
       task?.author_name ? `${task.author_name}${task.request_id ? ', request' : ''}` : ''].filter(Boolean).map(escapeHtml).join(' | ');
-    const tools = `<div class="bl-tools">
-      ${lane === 'done' ? '' : `<div class="bl-seg" role="group" aria-label="Move to">${LANES.map(name =>
-        `<button type="button" class="bl-seg-btn ${lane === name ? 'on' : ''}" data-action="lane" data-lane="${name}" aria-pressed="${lane === name}">${NAMES[name]}</button>`).join('')}</div>`}
-      ${task ? `<button type="button" class="bl-btn" data-action="finish">${lane === 'done' ? 'Reopen' : 'Mark done'}</button>` : ''}
-      ${task && !readonly ? (confirming
-        ? `<span class="bl-confirm" role="alertdialog" aria-label="Delete this task?">Delete this task?
-            <button type="button" class="bl-btn danger" data-action="confirm-delete">Delete</button>
-            <button type="button" class="bl-btn" data-action="cancel-delete">Keep</button></span>`
-        : `<button type="button" class="bl-icon" data-action="delete" aria-label="Delete task" title="Delete">${TRASH}</button>`) : ''}
-    </div>`;
-    const editor = readonly
-      ? `<h2 class="bl-title-read">${escapeHtml(stripTags(edit.title) || edit.title)}</h2><div class="bl-preview">${renderMarkdown(edit.body)}</div>`
-      : `<textarea class="bl-title-input" name="title" rows="1" placeholder="Title" maxlength="200" aria-label="Title" autocomplete="off">${escapeHtml(edit.title)}</textarea>
-        <div class="bl-modes" role="tablist" aria-label="Editor">
+    const lanePicker = lane === 'done' ? '' : `<label class="bl-lane"><select name="lane" aria-label="Move to">${LANES.map(name =>
+      `<option value="${name}" ${lane === name ? 'selected' : ''}>${NAMES[name]}</option>`).join('')}</select>${CHEVRON}</label>`;
+    const finish = task ? `<button type="button" class="bl-icon" data-action="finish" aria-label="${lane === 'done' ? 'Reopen' : 'Mark done'}" title="${lane === 'done' ? 'Reopen' : 'Mark done'}">${lane === 'done' ? UNDO : CHECK}</button>` : '';
+    const trash = task && !readonly ? `<button type="button" class="bl-icon" data-action="delete" aria-label="Delete task" title="Delete">${TRASH}</button>` : '';
+    const title = readonly
+      ? `<h2 class="bl-title-read">${escapeHtml(stripTags(edit.title) || edit.title)}</h2>`
+      : `<textarea class="bl-title-input" name="title" rows="1" placeholder="Title" maxlength="200" aria-label="Title" autocomplete="off">${escapeHtml(edit.title)}</textarea>`;
+    const body = readonly
+      ? `<div class="bl-preview">${renderMarkdown(edit.body)}</div>`
+      : `<div class="bl-modes" role="tablist" aria-label="Editor">
           <button type="button" role="tab" class="bl-mode ${edit.mode === 'write' ? 'on' : ''}" data-action="mode" data-mode="write" aria-selected="${edit.mode === 'write'}">Write</button>
           <button type="button" role="tab" class="bl-mode ${edit.mode === 'preview' ? 'on' : ''}" data-action="mode" data-mode="preview" aria-selected="${edit.mode === 'preview'}">Preview</button>
         </div>
         ${edit.mode === 'write'
           ? `<textarea class="bl-body-input" name="body" placeholder="Details, steps, notes. Markdown works." aria-label="Details" maxlength="1790">${escapeHtml(edit.body)}</textarea>`
           : `<div class="bl-preview">${edit.body.trim() ? renderMarkdown(edit.body) : '<p class="bl-quiet">Nothing to preview</p>'}</div>`}`;
-    pane.innerHTML = `<div class="bl-bar">
-        <button type="button" class="bl-btn" data-action="cancel">${readonly ? 'Close' : 'Cancel'}</button>
-        <span class="bl-bar-title">${openId === 'new' ? 'New task' : NAMES[lane]}</span>
-        ${readonly ? '<span class="bl-bar-gap"></span>' : `<button type="button" class="bl-btn primary" data-action="save">${openId === 'new' ? 'Add' : 'Save'}</button>`}
+    pane.innerHTML = `<div class="bl-head">
+        <button type="button" class="bl-icon bl-back" data-action="back" aria-label="Back to list" title="Back">${BACK}</button>
+        ${title}
+        <div class="bl-actions">${lanePicker}${finish}${trash}</div>
       </div>
-      ${tools}${editor}
-      ${total ? `<div class="bl-plan"><span>Plan, ${ticked} of ${total} steps</span><span class="bl-row-bar"><i style="width:${Math.round(ticked / total * 100)}%"></i></span></div>` : ''}
-      ${meta ? `<p class="bl-meta">${meta}</p>` : ''}`;
+      ${confirming ? `<div class="bl-confirm" role="alertdialog" aria-label="Delete this task?">Delete this task?
+        <button type="button" class="bl-btn danger" data-action="confirm-delete">Delete</button>
+        <button type="button" class="bl-btn" data-action="cancel-delete">Keep</button></div>` : ''}
+      ${meta ? `<p class="bl-meta">${meta}</p>` : ''}
+      <p class="bl-note" role="status"></p>
+      ${body}
+      ${total ? `<div class="bl-plan"><span>Plan, ${ticked} of ${total} steps</span><span class="bl-row-bar"><i style="width:${Math.round(ticked / total * 100)}%"></i></span></div>` : ''}`;
     q('.bl').classList.add('has-detail');
     autosize();
-    syncSave();
+    paintMessage();
     const target = focus || (openId === 'new' ? 'title' : null);
     if (target && !readonly) q(target === 'body' ? '.bl-body-input' : '.bl-title-input')?.focus();
   }
@@ -212,7 +212,7 @@ export function mountBacklog(root, adapter) {
       change(list);
       return toState(await adapter.save({ tasks: list }, base.revision));
     };
-    busy = true; message = ''; root.dataset.busy = ''; syncSave();
+    busy = true; message = ''; root.dataset.busy = '';
     try {
       try { state = await commit(state); }
       catch (error) {
@@ -224,7 +224,7 @@ export function mountBacklog(root, adapter) {
       message = error.conflict ? 'Backlog changed on another device. Try again.' : error.message || 'Could not save the backlog.';
       if (error.conflict) state = toState(await adapter.load().catch(() => state));
       return false;
-    } finally { busy = false; delete root.dataset.busy; paintList(); paintMessage(); syncSave(); }
+    } finally { busy = false; delete root.dataset.busy; paintList(); paintMessage(); }
   }
 
   function openTask(id) {
@@ -255,30 +255,43 @@ export function mountBacklog(root, adapter) {
   const fits = lane => lane !== 'now' || nowCount() < NOW_LIMIT;
   const full = () => { message = `Now is full (${NOW_LIMIT}). Move one out first.`; paintMessage(); };
 
+  // Notes save themselves a moment after typing stops.
+  const scheduleSave = () => { clearTimeout(saveTimer); saveTimer = setTimeout(autoSave, 700); };
+  function autoSave() {
+    if (!edit || !dirty() || !edit.title.trim()) return;
+    if (disabled()) { if (busy) scheduleSave(); return; }
+    saveTask();
+  }
+
   // Save the open task. Returns true if it is saved or nothing changed.
   async function saveTask() {
+    clearTimeout(saveTimer);
     if (!edit || disabled()) return false;
     const title = edit.title.trim();
     if (!dirty()) return true;
     if (!title) { message = 'Add a title.'; paintMessage(); return false; }
+    const sent = { title: edit.title, body: edit.body };
     const text = joinMessage(title, edit.body);
+    let created = false;
     if (openId === 'new') {
       if (!fits(edit.lane)) { full(); return false; }
       const task = newTask(text);
       setLane(task, edit.lane);
       if (!await mutate(list => list.push(task))) return false;
-      folder = edit.lane; openId = task.id;
+      folder = edit.lane; openId = task.id; created = true;
     } else {
       const id = openId;
       if (!await mutate(list => { const found = list.find(value => value.id === id); if (found) found.text = text; })) return false;
     }
-    resetEdit();
+    if (edit.title === sent.title && edit.body === sent.body) resetEdit(); else scheduleSave();
+    if (created) {
+      // A new task now has its own actions; redraw without losing the caret.
+      const box = document.activeElement, name = box?.name, from = box?.selectionStart, to = box?.selectionEnd;
+      paintDetail(name === 'body' ? 'body' : 'title');
+      const again = q(name === 'body' ? '.bl-body-input' : '.bl-title-input');
+      if (again && from != null) again.setSelectionRange(from, to);
+    }
     return true;
-  }
-
-  async function onSave() {
-    if (!await saveTask()) return;
-    if (wide()) { paintList(); paintDetail(); } else closeDetail();
   }
 
   // Lane, done and delete keep any unsaved text with them.
@@ -300,10 +313,10 @@ export function mountBacklog(root, adapter) {
   }
 
   const onLane = lane => {
-    if (openId === 'new') { edit.lane = lane; paintDetail(); return; }
+    if (openId === 'new') { edit.lane = lane; return; }
     const task = find(openId);
     if (!task || laneOf(task) === lane) return;
-    if (!fits(lane)) return full();
+    if (!fits(lane)) { full(); paintDetail(); return; }
     change(found => setLane(found, lane), { follow: lane });
   };
   const onFinish = () => {
@@ -315,7 +328,7 @@ export function mountBacklog(root, adapter) {
 
   // Moving to another task keeps what was typed on the open one.
   async function leaveOpen() {
-    if (openId !== null && dirty() && openId !== 'new') return saveTask();
+    if (openId !== null && dirty()) return saveTask();
     return true;
   }
 
@@ -333,9 +346,7 @@ export function mountBacklog(root, adapter) {
     else if (action === 'toggle-week') {
       weekOpen.set(button.dataset.week, button.getAttribute('aria-expanded') !== 'true');
       paintList();
-    } else if (action === 'cancel') closeDetail();
-    else if (action === 'save') onSave();
-    else if (action === 'lane') onLane(button.dataset.lane);
+    } else if (action === 'back') { if (await leaveOpen()) closeDetail(); }
     else if (action === 'finish') onFinish();
     else if (action === 'delete') { confirming = true; paintDetail(); }
     else if (action === 'cancel-delete') { confirming = false; paintDetail(); }
@@ -346,21 +357,22 @@ export function mountBacklog(root, adapter) {
   root.addEventListener('input', event => {
     const name = event.target.name;
     if (name === 'query') { query = event.target.value; paintList(); }
-    else if (name === 'title') { edit.title = event.target.value; autosize(); syncSave(); }
-    else if (name === 'body') { edit.body = event.target.value; autosize(); syncSave(); }
+    else if (name === 'title') { edit.title = event.target.value; autosize(); scheduleSave(); }
+    else if (name === 'body') { edit.body = event.target.value; autosize(); scheduleSave(); }
   });
+  root.addEventListener('change', event => { if (event.target.name === 'lane') onLane(event.target.value); });
 
-  root.addEventListener('keydown', event => {
+  root.addEventListener('keydown', async event => {
     const name = event.target.name;
     if (event.key === 'Escape') {
       if (confirming) { event.preventDefault(); confirming = false; paintDetail(); }
       else if (name === 'query' && query) { event.preventDefault(); query = ''; event.target.value = ''; paintList(); }
-      else if (openId !== null && (name === 'title' || name === 'body')) { event.preventDefault(); closeDetail(); }
+      else if (openId !== null && (name === 'title' || name === 'body')) { event.preventDefault(); if (await leaveOpen()) closeDetail(); }
       return;
     }
     if ((name === 'title' || name === 'body') && event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      onSave();
+      saveTask();
     } else if (name === 'title' && event.key === 'Enter') {
       event.preventDefault();
       if (edit.mode === 'write') q('.bl-body-input')?.focus();
